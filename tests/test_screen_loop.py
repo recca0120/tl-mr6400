@@ -62,6 +62,20 @@ class TestFetchOnlyOnRefresh:
         assert loop.sms_ctrl.messages[0]["unread"] == "0"
         client.set_sms_read.assert_called_once_with(1)
 
+    def test_mark_read_persists_after_refresh(self):
+        client = _make_client()
+        loop = DashboardLoop(client)
+        loop.tick(timeout=True)
+        loop.handle_key("mark_read")
+        assert loop.sms_ctrl.messages[0]["unread"] == "0"
+        # Simulate router still returning unread=1 (stale response)
+        client.get_sms.return_value = [
+            {"index": "1", "from": "A", "content": "hi", "receivedTime": "2026-01-01", "unread": "1"},
+            {"index": "2", "from": "B", "content": "yo", "receivedTime": "2026-01-02", "unread": "0"},
+        ]
+        loop.tick(timeout=True)
+        assert loop.sms_ctrl.messages[0]["unread"] == "0"
+
     def test_render_returns_styled_lines(self):
         client = _make_client()
         loop = DashboardLoop(client)

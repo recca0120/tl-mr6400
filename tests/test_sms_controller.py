@@ -9,6 +9,11 @@ SMS_DATA = [
     {"index": "122", "from": "555555", "content": "Test", "receivedTime": "2026-05-06 09:00:00", "unread": "1"},
 ]
 
+MANY_SMS = [
+    {"index": str(i), "from": f"0900{i:04d}", "content": f"Msg {i}", "receivedTime": f"2026-05-{i:02d} 10:00", "unread": str(i % 2)}
+    for i in range(1, 11)
+]
+
 
 class TestCursorNavigation:
     def test_initial_cursor_is_zero(self):
@@ -119,3 +124,70 @@ class TestDeleteSms:
         ctrl.set_messages([])
         ctrl.delete()
         client.delete_sms.assert_not_called()
+
+
+class TestViewport:
+    def test_initial_offset_is_zero(self):
+        ctrl = SmsController(MagicMock(), viewport_size=3)
+        ctrl.set_messages(MANY_SMS)
+        assert ctrl.scroll_offset == 0
+
+    def test_visible_messages(self):
+        ctrl = SmsController(MagicMock(), viewport_size=3)
+        ctrl.set_messages(MANY_SMS)
+        assert len(ctrl.visible_messages) == 3
+        assert ctrl.visible_messages[0]["index"] == "1"
+
+    def test_scroll_follows_cursor_down(self):
+        ctrl = SmsController(MagicMock(), viewport_size=3)
+        ctrl.set_messages(MANY_SMS)
+        for _ in range(4):
+            ctrl.move_down()
+        assert ctrl.cursor == 4
+        assert ctrl.scroll_offset == 2
+        assert ctrl.visible_messages[0]["index"] == "3"
+
+    def test_scroll_follows_cursor_up(self):
+        ctrl = SmsController(MagicMock(), viewport_size=3)
+        ctrl.set_messages(MANY_SMS)
+        for _ in range(5):
+            ctrl.move_down()
+        ctrl.move_up()
+        ctrl.move_up()
+        ctrl.move_up()
+        assert ctrl.scroll_offset <= ctrl.cursor
+
+    def test_cursor_relative_to_viewport(self):
+        ctrl = SmsController(MagicMock(), viewport_size=3)
+        ctrl.set_messages(MANY_SMS)
+        for _ in range(4):
+            ctrl.move_down()
+        assert ctrl.cursor_in_viewport == 2
+
+    def test_scrollbar_position(self):
+        ctrl = SmsController(MagicMock(), viewport_size=3)
+        ctrl.set_messages(MANY_SMS)
+        pos, total = ctrl.scrollbar_info
+        assert total == 10
+        assert pos == 0
+
+    def test_scrollbar_moves_with_scroll(self):
+        ctrl = SmsController(MagicMock(), viewport_size=3)
+        ctrl.set_messages(MANY_SMS)
+        for _ in range(9):
+            ctrl.move_down()
+        pos, total = ctrl.scrollbar_info
+        assert pos > 0
+
+    def test_no_viewport_shows_all(self):
+        ctrl = SmsController(MagicMock())
+        ctrl.set_messages(MANY_SMS)
+        assert len(ctrl.visible_messages) == 10
+
+    def test_wrap_down_resets_scroll(self):
+        ctrl = SmsController(MagicMock(), viewport_size=3)
+        ctrl.set_messages(MANY_SMS)
+        for _ in range(10):
+            ctrl.move_down()
+        assert ctrl.cursor == 0
+        assert ctrl.scroll_offset == 0

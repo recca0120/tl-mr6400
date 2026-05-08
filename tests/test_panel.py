@@ -122,3 +122,30 @@ class TestPanelGrid:
         lines = PanelGrid.horizontal([p1, p2])
         for text, style in lines:
             assert isinstance(style, str)
+
+
+class TestPanelScrollbar:
+    def test_no_scrollbar_by_default(self):
+        p = Panel("T", width=20, height=5)
+        p.add("A", "1")
+        lines = p.render()
+        for text, _ in lines:
+            assert "█" not in text or "░" not in text
+
+    def test_scrollbar_shows_on_right_border(self):
+        p = Panel("T", width=20, height=6, scrollbar=(0, 10, 3))
+        p.add("A", "1")
+        p.add("B", "2")
+        p.add("C", "3")
+        lines = p.render()
+        has_thumb = any("┃" in t for t, _ in lines)
+        has_track = any("│" in t for t, _ in lines)
+        assert has_thumb
+        assert has_track
+
+    def test_scrollbar_width_consistent(self):
+        p = Panel("T", width=20, height=6, scrollbar=(0, 10, 3))
+        p.add("A", "1")
+        lines = p.render()
+        for text, _ in lines:
+            assert display_width(text) == 20

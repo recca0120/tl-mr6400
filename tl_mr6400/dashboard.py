@@ -12,7 +12,8 @@ def _sanitize(text: str) -> str:
 
 def render_dashboard(
     status: dict, sms: list[dict], wlan: dict, lan: dict,
-    width: int = 80, sms_cursor: int | None = None
+    width: int = 80, sms_cursor: int | None = None,
+    sms_scrollbar: tuple[int, int, int] | None = None,
 ) -> list[tuple[str, str]]:
     wide = width >= MIN_SIDE_BY_SIDE
 
@@ -33,7 +34,7 @@ def render_dashboard(
         la = _build_lan_panel(lan, width, 5)
         lines = PanelGrid.vertical([lte, wan, wl, la])
 
-    sms_panel = _build_sms_panel(sms, width, sms_cursor)
+    sms_panel = _build_sms_panel(sms, width, sms_cursor, sms_scrollbar)
     lines.extend(sms_panel.render())
 
     return lines
@@ -116,7 +117,8 @@ def _wrap_text(text: str, max_width: int) -> list[str]:
     return lines
 
 
-def _build_sms_panel(sms: list[dict], width: int, sms_cursor: int | None = None) -> Panel:
+def _build_sms_panel(sms: list[dict], width: int, sms_cursor: int | None = None,
+                     scrollbar: tuple[int, int, int] | None = None) -> Panel:
     inner = width - 2
     content_indent = 3
     content_width = inner - content_indent
@@ -144,7 +146,7 @@ def _build_sms_panel(sms: list[dict], width: int, sms_cursor: int | None = None)
                 raw_lines.append((f"   {wrapped}", style))
 
     height = len(raw_lines) + 2
-    p = Panel("SMS", width, height)
+    p = Panel("SMS", width, height, scrollbar=scrollbar)
     for text, style in raw_lines:
         p.add_raw(text, style)
     return p

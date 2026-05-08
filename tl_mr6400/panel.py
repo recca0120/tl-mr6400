@@ -24,10 +24,12 @@ def _truncate(text: str, width: int) -> str:
 
 
 class Panel:
-    def __init__(self, title: str, width: int, height: int):
+    def __init__(self, title: str, width: int, height: int,
+                 scrollbar: tuple[int, int, int] | None = None):
         self.title = title
         self.width = width
         self.height = height
+        self._scrollbar = scrollbar
         self._rows: list[tuple[str, str] | str] = []
         self._styles: list[str] = []
 
@@ -58,9 +60,28 @@ class Panel:
             content_lines.append((empty_line, "empty"))
         content_lines = content_lines[:content_height]
 
+        if self._scrollbar is not None:
+            content_lines = self._apply_scrollbar(content_lines, content_height)
+
         result = [(top, "title")]
         result.extend(content_lines)
         result.append((bottom, "border"))
+        return result
+
+    def _apply_scrollbar(self, lines, track_height):
+        offset, total, viewport = self._scrollbar
+        if total <= viewport:
+            return lines
+
+        thumb_size = max(1, round(track_height * viewport / total))
+        thumb_pos = round(track_height * offset / total)
+        thumb_pos = min(thumb_pos, track_height - thumb_size)
+
+        result = []
+        for i, (text, style) in enumerate(lines):
+            if thumb_pos <= i < thumb_pos + thumb_size:
+                text = text[:-1] + "┃"
+            result.append((text, style))
         return result
 
     def _render_rows(self, inner: int) -> list[tuple[str, str]]:
