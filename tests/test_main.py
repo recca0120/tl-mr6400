@@ -184,3 +184,13 @@ class TestCmdStatusLan:
 
         result = json.loads(capsys.readouterr().out)
         assert result["IPInterfaceIPAddress"] == "192.168.1.1"
+
+
+class TestDefaultCommand:
+    @patch("main.cmd_dashboard")
+    def test_no_args_defaults_to_dashboard(self, mock_dashboard):
+        from main import main
+        import sys
+        with patch.object(sys, "argv", ["main.py"]):
+            main()
+        mock_dashboard.assert_called_once()

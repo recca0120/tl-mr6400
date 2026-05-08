@@ -144,7 +144,7 @@ def cmd_dashboard(args):
 def main():
     parser = argparse.ArgumentParser(description="TL-MR6400 CLI")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(dest="command")
 
     sms_parser = subparsers.add_parser("sms", help="Read SMS messages")
     sms_parser.add_argument("--page", type=int, default=1, help="Page number")
@@ -158,6 +158,9 @@ def main():
     dash_parser.add_argument("--interval", type=int, default=5, help="Refresh interval in seconds")
 
     args = parser.parse_args()
+    if args.command is None:
+        args.command = "dashboard"
+        args.interval = 5
     commands = {"sms": cmd_sms, "status": cmd_status, "dashboard": cmd_dashboard}
     commands[args.command](args)
 
