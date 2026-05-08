@@ -46,20 +46,10 @@ def cmd_sms(args):
         print()
 
 
-def cmd_status(args):
-    client = create_client()
-    status = client.get_status()
-    if args.json:
-        print(json_mod.dumps(status, ensure_ascii=False, indent=2))
-        return
-    if not status:
-        print("Failed to get status.")
-        return
-
+def _render_lte(t, status):
     dns = status.get("DNSServers", "")
     parts = dns.split(",") if dns else []
 
-    t = Table()
     t.section("LTE Signal")
     t.add("Network Type", NET_TYPES.get(status.get("netType", ""), status.get("netType", "?")))
     t.add("Signal Level", f'{status.get("sigLevel", "?")}/4')
@@ -75,23 +65,12 @@ def cmd_status(args):
     t.add("Primary DNS", parts[0] if parts else "?")
     t.add("Secondary DNS", parts[1] if len(parts) > 1 else "?")
     t.add("MAC Address", status.get("MACAddress", "?"))
-    print(t.render(), end="")
 
 
-def cmd_wlan(args):
-    client = create_client()
-    wlan = client.get_wlan()
-    if args.json:
-        print(json_mod.dumps(wlan, ensure_ascii=False, indent=2))
-        return
-    if not wlan:
-        print("Failed to get WLAN info.")
-        return
-
+def _render_wlan(t, wlan):
     enabled = "Enabled" if wlan.get("enable") == "1" else "Disabled"
     hidden = "On" if wlan.get("SSIDAdvertisementEnabled") == "0" else "Off"
 
-    t = Table()
     t.section("Wireless")
     t.add("SSID", wlan.get("SSID", "?"))
     t.add("Radio", enabled)
@@ -101,22 +80,11 @@ def cmd_wlan(args):
     t.add("Hide SSID", hidden)
     t.add("TX Power", f'{wlan.get("transmitPower", "?")}%')
     t.add("Clients", wlan.get("totalAssociations", "?"))
-    print(t.render(), end="")
 
 
-def cmd_lan(args):
-    client = create_client()
-    lan = client.get_lan()
-    if args.json:
-        print(json_mod.dumps(lan, ensure_ascii=False, indent=2))
-        return
-    if not lan:
-        print("Failed to get LAN info.")
-        return
-
+def _render_lan(t, lan):
     dhcp = "On" if lan.get("DHCPServerEnable") == "1" else "Off"
 
-    t = Table()
     t.section("LAN")
     t.add("IP Address", lan.get("IPInterfaceIPAddress", "?"))
     t.add("Subnet Mask", lan.get("IPInterfaceSubnetMask", "?"))
@@ -124,6 +92,46 @@ def cmd_lan(args):
     t.add("DHCP", dhcp)
     if dhcp == "On":
         t.add("DHCP Range", f'{lan.get("minAddress", "?")} - {lan.get("maxAddress", "?")}')
+
+
+def cmd_status(args):
+    client = create_client()
+    show_all = not (args.lte or args.wlan or args.lan)
+
+    if args.json:
+        data = {}
+        if show_all:
+            data["lte"] = client.get_status()
+            data["wlan"] = client.get_wlan()
+            data["lan"] = client.get_lan()
+        elif args.lte:
+            data = client.get_status()
+        elif args.wlan:
+            data = client.get_wlan()
+        elif args.lan:
+            data = client.get_lan()
+        print(json_mod.dumps(data, ensure_ascii=False, indent=2))
+        return
+
+    t = Table()
+
+    if show_all or args.lte:
+        status = client.get_status()
+        if not status:
+            print("Failed to get status.")
+            return
+        _render_lte(t, status)
+
+    if show_all or args.wlan:
+        wlan = client.get_wlan()
+        if wlan:
+            _render_wlan(t, wlan)
+
+    if show_all or args.lan:
+        lan = client.get_lan()
+        if lan:
+            _render_lan(t, lan)
+
     print(t.render(), end="")
 
 
@@ -141,15 +149,16 @@ def main():
     sms_parser = subparsers.add_parser("sms", help="Read SMS messages")
     sms_parser.add_argument("--page", type=int, default=1, help="Page number")
 
-    subparsers.add_parser("status", help="Show LTE signal and WAN IP status")
-    subparsers.add_parser("wlan", help="Show wireless info")
-    subparsers.add_parser("lan", help="Show LAN info")
+    status_parser = subparsers.add_parser("status", help="Show router status")
+    status_parser.add_argument("--lte", action="store_true", help="Show LTE signal and WAN only")
+    status_parser.add_argument("--wlan", action="store_true", help="Show wireless only")
+    status_parser.add_argument("--lan", action="store_true", help="Show LAN only")
 
     dash_parser = subparsers.add_parser("dashboard", help="Live dashboard (htop-style)")
     dash_parser.add_argument("--interval", type=int, default=5, help="Refresh interval in seconds")
 
     args = parser.parse_args()
-    commands = {"sms": cmd_sms, "status": cmd_status, "wlan": cmd_wlan, "lan": cmd_lan, "dashboard": cmd_dashboard}
+    commands = {"sms": cmd_sms, "status": cmd_status, "dashboard": cmd_dashboard}
     commands[args.command](args)
 
 

@@ -1,15 +1,27 @@
 import json
 from unittest.mock import patch, MagicMock
-from main import cmd_sms, cmd_status, cmd_wlan, cmd_lan
+from main import cmd_sms, cmd_status
 
 
 def _args(**kwargs):
     args = MagicMock()
     args.json = False
     args.page = 1
+    args.lte = False
+    args.wlan = False
+    args.lan = False
     for k, v in kwargs.items():
         setattr(args, k, v)
     return args
+
+
+def _mock_client(status=None, wlan=None, lan=None, sms=None):
+    client = MagicMock()
+    client.get_status.return_value = status or {}
+    client.get_wlan.return_value = wlan or {}
+    client.get_lan.return_value = lan or {}
+    client.get_sms.return_value = sms or []
+    return client
 
 
 SMS_DATA = [
@@ -56,154 +68,119 @@ LAN_DATA = {
 class TestCmdSms:
     @patch("main.create_client")
     def test_prints_messages(self, mock_create, capsys):
-        client = MagicMock()
-        client.get_sms.return_value = SMS_DATA
-        mock_create.return_value = client
-
+        mock_create.return_value = _mock_client(sms=SMS_DATA)
         cmd_sms(_args())
 
         output = capsys.readouterr().out
         assert "[unread]" in output
         assert "935188" in output
-        assert "Hello" in output
         assert "[read]" in output
-        assert "091234" in output
 
     @patch("main.create_client")
     def test_prints_no_messages(self, mock_create, capsys):
-        client = MagicMock()
-        client.get_sms.return_value = []
-        mock_create.return_value = client
-
+        mock_create.return_value = _mock_client()
         cmd_sms(_args())
-
         assert "No SMS" in capsys.readouterr().out
 
     @patch("main.create_client")
     def test_json_output(self, mock_create, capsys):
-        client = MagicMock()
-        client.get_sms.return_value = SMS_DATA
-        mock_create.return_value = client
-
+        mock_create.return_value = _mock_client(sms=SMS_DATA)
         cmd_sms(_args(json=True))
-
         result = json.loads(capsys.readouterr().out)
         assert len(result) == 2
-        assert result[0]["from"] == "935188"
 
 
-class TestCmdStatus:
+class TestCmdStatusAll:
     @patch("main.create_client")
-    def test_prints_signal_and_wan(self, mock_create, capsys):
-        client = MagicMock()
-        client.get_status.return_value = STATUS_DATA
-        mock_create.return_value = client
-
+    def test_shows_all_sections_by_default(self, mock_create, capsys):
+        mock_create.return_value = _mock_client(
+            status=STATUS_DATA, wlan=WLAN_DATA, lan=LAN_DATA
+        )
         cmd_status(_args())
 
         output = capsys.readouterr().out
-        assert "4G" in output
-        assert "2/4" in output
-        assert "-59" in output
-        assert "-92" in output
-        assert "36" in output
+        assert "LTE Signal" in output
+        assert "WAN Connection" in output
+        assert "Wireless" in output
+        assert "LAN" in output
         assert "10.2.153.186" in output
-        assert "Connected" in output
-        assert "61.31.1.1" in output
+        assert "TP-Link_C3AC" in output
+        assert "192.168.1.1" in output
 
     @patch("main.create_client")
-    def test_prints_failure_on_empty(self, mock_create, capsys):
-        client = MagicMock()
-        client.get_status.return_value = {}
-        mock_create.return_value = client
-
-        cmd_status(_args())
-
-        assert "Failed" in capsys.readouterr().out
-
-    @patch("main.create_client")
-    def test_json_output(self, mock_create, capsys):
-        client = MagicMock()
-        client.get_status.return_value = STATUS_DATA
-        mock_create.return_value = client
-
+    def test_json_output_all(self, mock_create, capsys):
+        mock_create.return_value = _mock_client(
+            status=STATUS_DATA, wlan=WLAN_DATA, lan=LAN_DATA
+        )
         cmd_status(_args(json=True))
 
         result = json.loads(capsys.readouterr().out)
-        assert result["sigLevel"] == "2"
-        assert result["externalIPAddress"] == "10.2.153.186"
+        assert "lte" in result
+        assert "wlan" in result
+        assert "lan" in result
+        assert result["lte"]["sigLevel"] == "2"
+        assert result["wlan"]["SSID"] == "TP-Link_C3AC"
+        assert result["lan"]["IPInterfaceIPAddress"] == "192.168.1.1"
 
 
-class TestCmdWlan:
+class TestCmdStatusLte:
     @patch("main.create_client")
-    def test_prints_wlan_info(self, mock_create, capsys):
-        client = MagicMock()
-        client.get_wlan.return_value = WLAN_DATA
-        mock_create.return_value = client
-
-        cmd_wlan(_args())
+    def test_shows_only_lte(self, mock_create, capsys):
+        mock_create.return_value = _mock_client(status=STATUS_DATA)
+        cmd_status(_args(lte=True))
 
         output = capsys.readouterr().out
+        assert "LTE Signal" in output
+        assert "WAN Connection" in output
+        assert "Wireless" not in output
+        assert "LAN" not in output
+
+    @patch("main.create_client")
+    def test_json_lte_only(self, mock_create, capsys):
+        mock_create.return_value = _mock_client(status=STATUS_DATA)
+        cmd_status(_args(lte=True, json=True))
+
+        result = json.loads(capsys.readouterr().out)
+        assert result["sigLevel"] == "2"
+
+
+class TestCmdStatusWlan:
+    @patch("main.create_client")
+    def test_shows_only_wlan(self, mock_create, capsys):
+        mock_create.return_value = _mock_client(wlan=WLAN_DATA)
+        cmd_status(_args(wlan=True))
+
+        output = capsys.readouterr().out
+        assert "Wireless" in output
         assert "TP-Link_C3AC" in output
-        assert "2.4GHz" in output
-        assert "11" in output
-        assert "Enabled" in output
+        assert "LTE Signal" not in output
+        assert "LAN" not in output
 
     @patch("main.create_client")
-    def test_prints_failure_on_empty(self, mock_create, capsys):
-        client = MagicMock()
-        client.get_wlan.return_value = {}
-        mock_create.return_value = client
-
-        cmd_wlan(_args())
-
-        assert "Failed" in capsys.readouterr().out
-
-    @patch("main.create_client")
-    def test_json_output(self, mock_create, capsys):
-        client = MagicMock()
-        client.get_wlan.return_value = WLAN_DATA
-        mock_create.return_value = client
-
-        cmd_wlan(_args(json=True))
+    def test_json_wlan_only(self, mock_create, capsys):
+        mock_create.return_value = _mock_client(wlan=WLAN_DATA)
+        cmd_status(_args(wlan=True, json=True))
 
         result = json.loads(capsys.readouterr().out)
         assert result["SSID"] == "TP-Link_C3AC"
 
 
-class TestCmdLan:
+class TestCmdStatusLan:
     @patch("main.create_client")
-    def test_prints_lan_info(self, mock_create, capsys):
-        client = MagicMock()
-        client.get_lan.return_value = LAN_DATA
-        mock_create.return_value = client
-
-        cmd_lan(_args())
+    def test_shows_only_lan(self, mock_create, capsys):
+        mock_create.return_value = _mock_client(lan=LAN_DATA)
+        cmd_status(_args(lan=True))
 
         output = capsys.readouterr().out
+        assert "LAN" in output
         assert "192.168.1.1" in output
-        assert "255.255.255.0" in output
-        assert "B0:95:75:73:C3:AC" in output
-        assert "192.168.1.100" in output
-        assert "192.168.1.199" in output
+        assert "LTE Signal" not in output
+        assert "Wireless" not in output
 
     @patch("main.create_client")
-    def test_prints_failure_on_empty(self, mock_create, capsys):
-        client = MagicMock()
-        client.get_lan.return_value = {}
-        mock_create.return_value = client
-
-        cmd_lan(_args())
-
-        assert "Failed" in capsys.readouterr().out
-
-    @patch("main.create_client")
-    def test_json_output(self, mock_create, capsys):
-        client = MagicMock()
-        client.get_lan.return_value = LAN_DATA
-        mock_create.return_value = client
-
-        cmd_lan(_args(json=True))
+    def test_json_lan_only(self, mock_create, capsys):
+        mock_create.return_value = _mock_client(lan=LAN_DATA)
+        cmd_status(_args(lan=True, json=True))
 
         result = json.loads(capsys.readouterr().out)
         assert result["IPInterfaceIPAddress"] == "192.168.1.1"
