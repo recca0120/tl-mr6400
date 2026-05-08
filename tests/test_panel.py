@@ -1,4 +1,21 @@
-from tl_mr6400.panel import Panel, PanelGrid
+from tl_mr6400.panel import Panel, PanelGrid, display_width
+
+
+class TestDisplayWidth:
+    def test_ascii(self):
+        assert display_width("hello") == 5
+
+    def test_chinese(self):
+        assert display_width("你好") == 4
+
+    def test_mixed(self):
+        assert display_width("hi你好") == 6
+
+    def test_empty(self):
+        assert display_width("") == 0
+
+    def test_box_chars(self):
+        assert display_width("┌─┐") == 3
 
 
 class TestPanel:
@@ -34,6 +51,20 @@ class TestPanel:
         lines = p.render()
         content = "".join(lines)
         assert "hello world" in content
+
+    def test_truncates_chinese_by_display_width(self):
+        p = Panel("T", width=20, height=4)
+        p.add_raw("你好世界測試中文字串超長文字")
+        lines = p.render()
+        for line in lines:
+            assert display_width(line) == 20, f"Display width {display_width(line)} != 20: {repr(line)}"
+
+    def test_pads_chinese_content_correctly(self):
+        p = Panel("T", width=20, height=4)
+        p.add_raw("你好")
+        lines = p.render()
+        for line in lines:
+            assert display_width(line) == 20, f"Display width {display_width(line)} != 20: {repr(line)}"
 
     def test_pads_empty_rows(self):
         p = Panel("T", width=20, height=6)

@@ -1,4 +1,5 @@
 from tl_mr6400.dashboard import render_dashboard
+from tl_mr6400.panel import display_width
 
 
 STATUS_DATA = {
@@ -59,7 +60,7 @@ class TestRenderDashboard:
     def test_consistent_line_width(self):
         lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
         for line in lines:
-            assert len(line) == 80, f"Width {len(line)} != 80: {repr(line)}"
+            assert display_width(line) == 80, f"Width {display_width(line)} != 80: {repr(line)}"
 
 
 class TestRenderDashboardSms:
@@ -87,6 +88,14 @@ class TestRenderDashboardSms:
                 assert "●" in line or "*" in line
                 break
 
+    def test_chinese_sms_consistent_width(self):
+        chinese_sms = [
+            {"from": "935188", "content": "提醒您4G上網吃到飽將於2026/05/08 13:34結束，儲值請至APP或官網(twm5g.co/NGBy)，短效卡不適用儲值展延", "receivedTime": "2026-05-08 12:06:08", "unread": "1"},
+        ]
+        lines = render_dashboard(STATUS_DATA, chinese_sms, WLAN_DATA, LAN_DATA, width=80)
+        for line in lines:
+            assert display_width(line) == 80, f"Width {display_width(line)} != 80: {repr(line)}"
+
     def test_empty_sms(self):
         lines = render_dashboard(STATUS_DATA, [], WLAN_DATA, LAN_DATA, width=80)
         text = "\n".join(lines)
@@ -108,7 +117,7 @@ class TestRenderDashboardRwd:
     def test_narrow_layout_stacked(self):
         lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=50)
         for line in lines:
-            assert len(line) == 50, f"Width {len(line)} != 50: {repr(line)}"
+            assert display_width(line) == 50, f"Width {display_width(line)} != 50: {repr(line)}"
         # Stacked: LTE and WAN should NOT be on the same line
         for line in lines:
             if "LTE" in line:
@@ -119,4 +128,4 @@ class TestRenderDashboardRwd:
         lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=40)
         assert len(lines) > 0
         for line in lines:
-            assert len(line) == 40
+            assert display_width(line) == 40
