@@ -1,10 +1,18 @@
 import curses
 import time
 from tl_mr6400.client import TlMr6400Client
-from tl_mr6400.dashboard import render_dashboard
-from tl_mr6400.sms_controller import SmsController
+from tl_mr6400.screen_logic import DashboardLoop
 
 STYLE_MAP = {}
+
+KEY_MAP = {
+    curses.KEY_DOWN: "down",
+    ord("j"): "down",
+    curses.KEY_UP: "up",
+    ord("k"): "up",
+    ord("d"): "delete",
+    ord("m"): "mark_read",
+}
 
 
 def _init_colors():
@@ -15,7 +23,6 @@ def _init_colors():
     curses.init_pair(3, curses.COLOR_YELLOW, -1)
     curses.init_pair(4, curses.COLOR_WHITE, -1)
     curses.init_pair(5, curses.COLOR_BLACK, curses.COLOR_CYAN)
-    curses.init_pair(6, curses.COLOR_RED, -1)
 
     STYLE_MAP.update({
         "title": curses.color_pair(1) | curses.A_BOLD,
@@ -27,14 +34,6 @@ def _init_colors():
         "sms_selected": curses.color_pair(5) | curses.A_BOLD,
         "empty": curses.color_pair(2),
     })
-
-
-def _fetch_data(client: TlMr6400Client):
-    status = client.get_status()
-    sms = client.get_sms()
-    wlan = client.get_wlan()
-    lan = client.get_lan()
-    return status, sms, wlan, lan
 
 
 def _draw(stdscr, lines):
@@ -56,7 +55,7 @@ def _draw(stdscr, lines):
         except curses.error:
             pass
 
-    keys = " q:quit  r:refresh  ↑↓:select  d:delete  m:mark read "
+    keys = " q:quit  r:refresh  ↑↓/jk:select  d:delete  m:mark read "
     try:
         stdscr.addnstr(max_y - 1, 0, keys.ljust(max_x), max_x - 1, curses.A_REVERSE)
     except curses.error:
@@ -71,28 +70,20 @@ def run_dashboard(client: TlMr6400Client, interval: int = 5):
         curses.curs_set(0)
         stdscr.timeout(interval * 1000)
 
-        sms_ctrl = SmsController(client)
+        loop = DashboardLoop(client)
+        loop.tick(timeout=True)
 
         while True:
             max_y, max_x = stdscr.getmaxyx()
-            status, sms, wlan, lan = _fetch_data(client)
-            sms_ctrl.set_messages(sms)
-            lines = render_dashboard(
-                status, sms_ctrl.messages, wlan, lan,
-                width=max_x, sms_cursor=sms_ctrl.cursor,
-            )
+            lines = loop.render(width=max_x)
             _draw(stdscr, lines)
 
             key = stdscr.getch()
             if key in (ord("q"), ord("Q")):
                 break
-            elif key == curses.KEY_DOWN or key == ord("j"):
-                sms_ctrl.move_down()
-            elif key == curses.KEY_UP or key == ord("k"):
-                sms_ctrl.move_up()
-            elif key == ord("d"):
-                sms_ctrl.delete()
-            elif key == ord("m"):
-                sms_ctrl.mark_read()
+            elif key == -1 or key == ord("r"):
+                loop.tick(timeout=True)
+            elif key in KEY_MAP:
+                loop.handle_key(KEY_MAP[key])
 
     curses.wrapper(_main)
