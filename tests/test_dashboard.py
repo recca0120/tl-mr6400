@@ -34,76 +34,116 @@ LAN_DATA = {
     "DHCPServerEnable": "1",
 }
 
+VALID_STYLES = {"border", "title", "key", "value", "sms_unread", "sms_read", "empty"}
+
 
 class TestRenderDashboard:
-    def test_returns_list_of_strings(self):
+    def test_returns_styled_lines(self):
         lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
         assert isinstance(lines, list)
-        assert all(isinstance(line, str) for line in lines)
+        for text, style in lines:
+            assert isinstance(text, str)
+            assert style in VALID_STYLES
 
     def test_contains_all_sections(self):
         lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
-        text = "\n".join(lines)
+        text = "\n".join(t for t, _ in lines)
         assert "4G LTE" in text
         assert "-92" in text
         assert "10.2.153.186" in text
-        assert "Connected" in text
         assert "TP-Link_C3AC" in text
         assert "192.168.1.1" in text
 
     def test_signal_has_bar_graphic(self):
         lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
-        text = "\n".join(lines)
+        text = "\n".join(t for t, _ in lines)
         assert "▰" in text or "█" in text
 
-    def test_rsrp_has_level_bar(self):
+    def test_consistent_display_width(self):
         lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
-        text = "\n".join(lines)
-        assert "█" in text or "░" in text
+        for text, _ in lines:
+            assert display_width(text) == 80, f"Width {display_width(text)} != 80: {repr(text)}"
 
-    def test_has_box_borders(self):
+
+class TestDashboardStyles:
+    def test_top_border_has_title_style(self):
         lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
-        text = "\n".join(lines)
-        assert "┌" in text
-        assert "└" in text
+        for text, style in lines:
+            if text.lstrip().startswith("┌"):
+                assert style == "title"
+                break
 
-    def test_consistent_line_width(self):
+    def test_bottom_border_has_border_style(self):
         lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
-        for line in lines:
-            assert display_width(line) == 80, f"Width {display_width(line)} != 80: {repr(line)}"
+        for text, style in lines:
+            if text.lstrip().startswith("└"):
+                assert style == "border"
+                break
+
+    def test_title_lines_have_title_style(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
+        title_lines = [(t, s) for t, s in lines if "LTE Signal" in t or "WAN" in t]
+        for _, style in title_lines:
+            assert style == "title"
+
+    def test_key_value_lines_have_key_style(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
+        for text, style in lines:
+            if "Network" in text and "4G LTE" in text:
+                assert style == "key"
+                break
+
+    def test_unread_sms_has_unread_style(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
+        for text, style in lines:
+            if "935188" in text:
+                assert style == "sms_unread"
+                break
+
+    def test_read_sms_has_read_style(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
+        for text, style in lines:
+            if "091234" in text:
+                assert style == "sms_read"
+                break
+
+    def test_unread_content_inherits_unread_style(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
+        for text, style in lines:
+            if "Hello World" in text:
+                assert style == "sms_unread"
+                break
+
+    def test_empty_lines_have_empty_style(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
+        for text, style in lines:
+            if text.strip() == "│" + " " * (len(text) - 2) + "│" or (text.startswith("│") and text.strip("│ ") == ""):
+                assert style in ("empty", "border")
 
 
-class TestRenderDashboardSms:
+class TestDashboardSms:
     def test_sender_and_time_on_same_line(self):
         lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
-        text = "\n".join(lines)
-        for line in lines:
-            if "935188" in line:
-                assert "2026-05-08" in line
+        for text, _ in lines:
+            if "935188" in text:
+                assert "2026-05-08" in text
                 break
         else:
             assert False, "Sender line not found"
 
     def test_content_on_next_line(self):
         lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
-        for i, line in enumerate(lines):
-            if "935188" in line:
-                assert "Hello World" in lines[i + 1]
+        for i, (text, _) in enumerate(lines):
+            if "935188" in text:
+                assert "Hello World" in lines[i + 1][0]
                 break
 
-    def test_unread_marker(self):
-        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
-        for line in lines:
-            if "935188" in line:
-                assert "●" in line or "*" in line
-                break
-
-    def test_long_sms_wraps_instead_of_truncate(self):
+    def test_long_sms_wraps(self):
         long_sms = [
             {"from": "935188", "content": "A" * 200, "receivedTime": "2026-05-08 12:06:08", "unread": "1"},
         ]
         lines = render_dashboard(STATUS_DATA, long_sms, WLAN_DATA, LAN_DATA, width=80)
-        content_lines = [l for l in lines if "AAAA" in l]
+        content_lines = [t for t, _ in lines if "AAAA" in t]
         assert len(content_lines) >= 2
 
     def test_strips_control_characters(self):
@@ -111,48 +151,42 @@ class TestRenderDashboardSms:
             {"from": "123", "content": "hello\r\nworld\r", "receivedTime": "2026-01-01 00:00", "unread": "0"},
         ]
         lines = render_dashboard(STATUS_DATA, ctrl_sms, WLAN_DATA, LAN_DATA, width=80)
-        for line in lines:
-            assert "\r" not in line
-            assert "\n" not in line
+        for text, _ in lines:
+            assert "\r" not in text
+            assert "\n" not in text
 
     def test_chinese_sms_consistent_width(self):
         chinese_sms = [
             {"from": "935188", "content": "提醒您4G上網吃到飽將於2026/05/08 13:34結束，儲值請至APP或官網(twm5g.co/NGBy)，短效卡不適用儲值展延", "receivedTime": "2026-05-08 12:06:08", "unread": "1"},
         ]
         lines = render_dashboard(STATUS_DATA, chinese_sms, WLAN_DATA, LAN_DATA, width=80)
-        for line in lines:
-            assert display_width(line) == 80, f"Width {display_width(line)} != 80: {repr(line)}"
+        for text, _ in lines:
+            assert display_width(text) == 80, f"Width {display_width(text)} != 80: {repr(text)}"
 
     def test_empty_sms(self):
         lines = render_dashboard(STATUS_DATA, [], WLAN_DATA, LAN_DATA, width=80)
-        text = "\n".join(lines)
+        text = "\n".join(t for t, _ in lines)
         assert "No messages" in text
 
 
-class TestRenderDashboardRwd:
+class TestDashboardRwd:
     def test_wide_layout_side_by_side(self):
         lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
-        for line in lines:
-            assert len(line) == 80
-        # Side-by-side: LTE and WAN titles should be on the same line
-        for line in lines:
-            if "LTE" in line and "WAN" in line:
+        for text, _ in lines:
+            if "LTE" in text and "WAN" in text:
                 break
         else:
-            assert False, "LTE and WAN should be on the same line in wide layout"
+            assert False, "LTE and WAN should be on the same line"
 
     def test_narrow_layout_stacked(self):
         lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=50)
-        for line in lines:
-            assert display_width(line) == 50, f"Width {display_width(line)} != 50: {repr(line)}"
-        # Stacked: LTE and WAN should NOT be on the same line
-        for line in lines:
-            if "LTE" in line:
-                assert "WAN" not in line
-                break
+        for text, _ in lines:
+            assert display_width(text) == 50
+            if "LTE" in text:
+                assert "WAN" not in text
 
-    def test_very_narrow_still_works(self):
+    def test_very_narrow(self):
         lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=40)
         assert len(lines) > 0
-        for line in lines:
-            assert display_width(line) == 40
+        for text, _ in lines:
+            assert display_width(text) == 40

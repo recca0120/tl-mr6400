@@ -29,14 +29,17 @@ class Panel:
         self.width = width
         self.height = height
         self._rows: list[tuple[str, str] | str] = []
+        self._styles: list[str] = []
 
-    def add(self, key: str, value: str):
+    def add(self, key: str, value: str, style: str = "key"):
         self._rows.append((key, value))
+        self._styles.append(style)
 
-    def add_raw(self, text: str):
+    def add_raw(self, text: str, style: str = "value"):
         self._rows.append(text)
+        self._styles.append(style)
 
-    def render(self) -> list[str]:
+    def render(self) -> list[tuple[str, str]]:
         w = self.width
         inner = w - 2
 
@@ -50,21 +53,25 @@ class Panel:
         content_lines = self._render_rows(inner)
 
         content_height = self.height - 2
-        empty = f"│{' ' * inner}│"
+        empty_line = f"│{' ' * inner}│"
         while len(content_lines) < content_height:
-            content_lines.append(empty)
+            content_lines.append((empty_line, "empty"))
         content_lines = content_lines[:content_height]
 
-        return [top] + content_lines + [bottom]
+        result = [(top, "title")]
+        result.extend(content_lines)
+        result.append((bottom, "border"))
+        return result
 
-    def _render_rows(self, inner: int) -> list[str]:
+    def _render_rows(self, inner: int) -> list[tuple[str, str]]:
         max_key = max(
             (len(row[0]) for row in self._rows if isinstance(row, tuple)),
             default=0,
         )
 
         lines = []
-        for row in self._rows:
+        for i, row in enumerate(self._rows):
+            style = self._styles[i] if i < len(self._styles) else "value"
             if isinstance(row, str):
                 text = _truncate(row, inner)
                 text = _pad(text, inner)
@@ -75,13 +82,13 @@ class Panel:
                 val_text = _truncate(val, remaining)
                 val_text = _pad(val_text, remaining)
                 text = prefix + val_text
-            lines.append(f"│{text}│")
+            lines.append((f"│{text}│", style))
         return lines
 
 
 class PanelGrid:
     @staticmethod
-    def horizontal(panels: list['Panel']) -> list[str]:
+    def horizontal(panels: list['Panel']) -> list[tuple[str, str]]:
         rendered = [p.render() for p in panels]
         max_h = max(len(r) for r in rendered)
 
@@ -89,16 +96,17 @@ class PanelGrid:
             w = panels[i].width
             empty = f"│{' ' * (w - 2)}│"
             while len(r) < max_h:
-                r.append(empty)
+                r.append((empty, "empty"))
 
         lines = []
         for row_idx in range(max_h):
-            line = "".join(r[row_idx] for r in rendered)
-            lines.append(line)
+            texts = [r[row_idx][0] for r in rendered]
+            style = rendered[0][row_idx][1]
+            lines.append(("".join(texts), style))
         return lines
 
     @staticmethod
-    def vertical(panels: list['Panel']) -> list[str]:
+    def vertical(panels: list['Panel']) -> list[tuple[str, str]]:
         lines = []
         for p in panels:
             lines.extend(p.render())

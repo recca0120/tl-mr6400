@@ -3,6 +3,8 @@ import time
 from tl_mr6400.client import TlMr6400Client
 from tl_mr6400.dashboard import render_dashboard
 
+STYLE_MAP = {}
+
 
 def _init_colors():
     curses.start_color()
@@ -10,6 +12,19 @@ def _init_colors():
     curses.init_pair(1, curses.COLOR_CYAN, -1)
     curses.init_pair(2, curses.COLOR_GREEN, -1)
     curses.init_pair(3, curses.COLOR_YELLOW, -1)
+    curses.init_pair(4, curses.COLOR_WHITE, -1)
+    curses.init_pair(5, curses.COLOR_RED, -1)
+    curses.init_pair(6, curses.COLOR_MAGENTA, -1)
+
+    STYLE_MAP.update({
+        "title": curses.color_pair(1) | curses.A_BOLD,
+        "border": curses.color_pair(2),
+        "key": curses.color_pair(4),
+        "value": curses.color_pair(4),
+        "sms_unread": curses.color_pair(3) | curses.A_BOLD,
+        "sms_read": curses.color_pair(4) | curses.A_DIM,
+        "empty": curses.color_pair(2),
+    })
 
 
 def _fetch_data(client: TlMr6400Client):
@@ -21,27 +36,21 @@ def _fetch_data(client: TlMr6400Client):
 
 
 def _draw(stdscr, lines):
-    stdscr.clear()
+    stdscr.erase()
     max_y, max_x = stdscr.getmaxyx()
 
     title = f" TL-MR6400 Dashboard  [{time.strftime('%H:%M:%S')}] "
     try:
-        stdscr.addnstr(0, 0, title.center(max_x), max_x - 1, curses.color_pair(1) | curses.A_BOLD)
+        stdscr.addnstr(0, 0, title.center(max_x), max_x - 1, STYLE_MAP["title"])
     except curses.error:
         pass
 
-    for i, line in enumerate(lines, start=2):
+    for i, (text, style) in enumerate(lines, start=2):
         if i >= max_y - 1:
             break
-        attr = curses.A_NORMAL
-        if line.startswith("┌") or line.startswith("└"):
-            attr = curses.color_pair(2)
-        elif line.startswith("│"):
-            attr = curses.color_pair(2)
-            if "*" in line[:5]:
-                attr = curses.color_pair(3) | curses.A_BOLD
+        attr = STYLE_MAP.get(style, curses.A_NORMAL)
         try:
-            stdscr.addnstr(i, 0, line, max_x - 1, attr)
+            stdscr.addnstr(i, 0, text, max_x - 1, attr)
         except curses.error:
             pass
 

@@ -12,7 +12,7 @@ def _sanitize(text: str) -> str:
 
 def render_dashboard(
     status: dict, sms: list[dict], wlan: dict, lan: dict, width: int = 80
-) -> list[str]:
+) -> list[tuple[str, str]]:
     wide = width >= MIN_SIDE_BY_SIDE
 
     if wide:
@@ -120,21 +120,23 @@ def _build_sms_panel(sms: list[dict], width: int) -> Panel:
     content_indent = 3
     content_width = inner - content_indent
 
-    raw_lines: list[str] = []
+    raw_lines: list[tuple[str, str]] = []
     if not sms:
-        raw_lines.append("  No messages")
+        raw_lines.append(("  No messages", "value"))
     else:
         for msg in sms[:5]:
-            marker = "●" if msg.get("unread") == "1" else " "
+            unread = msg.get("unread") == "1"
+            style = "sms_unread" if unread else "sms_read"
+            marker = "●" if unread else " "
             sender = msg.get("from", "?")
             time = msg.get("receivedTime", "?")
-            raw_lines.append(f" {marker} {sender:<12} {time}")
+            raw_lines.append((f" {marker} {sender:<12} {time}", style))
             content = _sanitize(msg.get("content", ""))
             for wrapped in _wrap_text(content, content_width):
-                raw_lines.append(f"   {wrapped}")
+                raw_lines.append((f"   {wrapped}", style))
 
     height = len(raw_lines) + 2
     p = Panel("SMS", width, height)
-    for line in raw_lines:
-        p.add_raw(line)
+    for text, style in raw_lines:
+        p.add_raw(text, style)
     return p
