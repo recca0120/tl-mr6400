@@ -65,10 +65,24 @@ class TlMr6400Client:
             "[LTE_NET_STATUS#0,0,0,0,0,0#0,0,0,0,0,0]0,0\r\n"
             "[WAN_IP_CONN#0,0,0,0,0,0#0,0,0,0,0,0]1,0\r\n"
         )
-        entries = self._query("5&5", data)
+        return self._query_merged("5&5", data)
+
+    def _query_merged(self, act_types: str, data: str) -> dict:
+        entries = self._query(act_types, data)
         if not entries:
             return {}
         merged = {}
         for entry in entries:
             merged.update(entry)
         return merged
+
+    def get_wlan(self) -> dict:
+        data = "[LAN_WLAN#0,0,0,0,0,0#0,0,0,0,0,0]0,0\r\n"
+        return self._query_merged("5", data)
+
+    def get_lan(self) -> dict:
+        data = (
+            "[LAN_IP_INTF#0,0,0,0,0,0#0,0,0,0,0,0]0,0\r\n"
+            "[LAN_HOST_CFG#1,0,0,0,0,0#0,0,0,0,0,0]1,0\r\n"
+        )
+        return self._query_merged("5&1", data)

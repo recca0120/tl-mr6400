@@ -150,3 +150,81 @@ class TestGetStatus:
         client._token = "fake_token"
 
         assert client.get_status() == {}
+
+
+WLAN_RESPONSE = (
+    "[1,1,0,0,0,0]0\n"
+    "enable=1\n"
+    "SSID=TP-Link_C3AC\n"
+    "channel=11\n"
+    "X_TP_Band=2.4GHz\n"
+    "X_TP_Bandwidth=20M\n"
+    "SSIDAdvertisementEnabled=0\n"
+    "transmitPower=100\n"
+    "totalAssociations=1\n"
+    "[error]0\n"
+)
+
+LAN_RESPONSE = (
+    "[1,1,0,0,0,0]0\n"
+    "IPInterfaceIPAddress=192.168.1.1\n"
+    "IPInterfaceSubnetMask=255.255.255.0\n"
+    "X_TP_MACAddress=B0:95:75:73:C3:AC\n"
+    "[1,0,0,0,0,0]1\n"
+    "DHCPServerEnable=1\n"
+    "minAddress=192.168.1.100\n"
+    "maxAddress=192.168.1.199\n"
+    "[error]0\n"
+)
+
+
+class TestGetWlan:
+    def test_returns_wlan_info(self):
+        session = MagicMock()
+        session.post.return_value = _mock_response(WLAN_RESPONSE)
+
+        client = TlMr6400Client("http://192.168.1.1", "admin", session=session)
+        client._token = "fake_token"
+
+        wlan = client.get_wlan()
+
+        assert wlan["SSID"] == "TP-Link_C3AC"
+        assert wlan["channel"] == "11"
+        assert wlan["X_TP_Band"] == "2.4GHz"
+        assert wlan["enable"] == "1"
+
+    def test_returns_empty_on_http_error(self):
+        session = MagicMock()
+        session.post.return_value = _mock_response(status_code=500)
+
+        client = TlMr6400Client("http://192.168.1.1", "admin", session=session)
+        client._token = "fake_token"
+
+        assert client.get_wlan() == {}
+
+
+class TestGetLan:
+    def test_returns_lan_info(self):
+        session = MagicMock()
+        session.post.return_value = _mock_response(LAN_RESPONSE)
+
+        client = TlMr6400Client("http://192.168.1.1", "admin", session=session)
+        client._token = "fake_token"
+
+        lan = client.get_lan()
+
+        assert lan["IPInterfaceIPAddress"] == "192.168.1.1"
+        assert lan["IPInterfaceSubnetMask"] == "255.255.255.0"
+        assert lan["X_TP_MACAddress"] == "B0:95:75:73:C3:AC"
+        assert lan["DHCPServerEnable"] == "1"
+        assert lan["minAddress"] == "192.168.1.100"
+        assert lan["maxAddress"] == "192.168.1.199"
+
+    def test_returns_empty_on_http_error(self):
+        session = MagicMock()
+        session.post.return_value = _mock_response(status_code=500)
+
+        client = TlMr6400Client("http://192.168.1.1", "admin", session=session)
+        client._token = "fake_token"
+
+        assert client.get_lan() == {}

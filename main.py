@@ -39,8 +39,7 @@ def cmd_sms(args):
 
 
 def cmd_status(args):
-    NET_TYPES = {"0": "No Service", "1": "2G", "2": "3G", "3": "4G"}
-    CONN_STATS = {"0": "Disconnected", "1": "Connecting", "2": "Connected", "3": "Disconnecting", "4": "Connected"}
+    NET_TYPES = {"0": "No Service", "1": "2G", "2": "3G", "3": "4G LTE"}
 
     client = create_client()
     status = client.get_status()
@@ -55,12 +54,56 @@ def cmd_status(args):
     print(f'  RSRP         : {status.get("rfInfoRsrp", "?")} dBm')
     print(f'  RSRQ         : {status.get("rfInfoRsrq", "?")} dB')
     print(f'  SNR          : {status.get("rfInfoSnr", "?")} dB')
+    print(f'  Band         : {status.get("rfInfoBand", "?")}')
     print()
     print("=== WAN Connection ===")
     print(f'  Status       : {status.get("connectionStatus", "?")}')
     print(f'  IP Address   : {status.get("externalIPAddress", "?")}')
     print(f'  Gateway      : {status.get("defaultGateway", "?")}')
-    print(f'  DNS          : {status.get("DNSServers", "?")}')
+    dns = status.get("DNSServers", "")
+    parts = dns.split(",") if dns else []
+    print(f'  Primary DNS  : {parts[0] if parts else "?"}')
+    print(f'  Secondary DNS: {parts[1] if len(parts) > 1 else "?"}')
+    print(f'  MAC Address  : {status.get("MACAddress", "?")}')
+
+
+def cmd_wlan(args):
+    client = create_client()
+    wlan = client.get_wlan()
+    if not wlan:
+        print("Failed to get WLAN info.")
+        return
+
+    enabled = "Enabled" if wlan.get("enable") == "1" else "Disabled"
+    hidden = "On" if wlan.get("SSIDAdvertisementEnabled") == "0" else "Off"
+
+    print("=== Wireless ===")
+    print(f'  SSID         : {wlan.get("SSID", "?")}')
+    print(f'  Radio        : {enabled}')
+    print(f'  Band         : {wlan.get("X_TP_Band", "?")}')
+    print(f'  Channel      : {wlan.get("channel", "?")}')
+    print(f'  Bandwidth    : {wlan.get("X_TP_Bandwidth", "?")}')
+    print(f'  Hide SSID    : {hidden}')
+    print(f'  TX Power     : {wlan.get("transmitPower", "?")}%')
+    print(f'  Clients      : {wlan.get("totalAssociations", "?")}')
+
+
+def cmd_lan(args):
+    client = create_client()
+    lan = client.get_lan()
+    if not lan:
+        print("Failed to get LAN info.")
+        return
+
+    dhcp = "On" if lan.get("DHCPServerEnable") == "1" else "Off"
+
+    print("=== LAN ===")
+    print(f'  IP Address   : {lan.get("IPInterfaceIPAddress", "?")}')
+    print(f'  Subnet Mask  : {lan.get("IPInterfaceSubnetMask", "?")}')
+    print(f'  MAC Address  : {lan.get("X_TP_MACAddress", "?")}')
+    print(f'  DHCP         : {dhcp}')
+    if dhcp == "On":
+        print(f'  DHCP Range   : {lan.get("minAddress", "?")} - {lan.get("maxAddress", "?")}')
 
 
 def main():
@@ -71,9 +114,11 @@ def main():
     sms_parser.add_argument("--page", type=int, default=1, help="Page number")
 
     subparsers.add_parser("status", help="Show LTE signal and WAN IP status")
+    subparsers.add_parser("wlan", help="Show wireless info")
+    subparsers.add_parser("lan", help="Show LAN info")
 
     args = parser.parse_args()
-    commands = {"sms": cmd_sms, "status": cmd_status}
+    commands = {"sms": cmd_sms, "status": cmd_status, "wlan": cmd_wlan, "lan": cmd_lan}
     commands[args.command](args)
 
 
