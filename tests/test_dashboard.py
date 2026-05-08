@@ -1,6 +1,8 @@
 from tl_mr6400.dashboard import render_dashboard
 from tl_mr6400.panel import display_width
 
+VALID_STYLES = {"border", "title", "key", "value", "sms_unread", "sms_read", "sms_selected", "empty"}
+
 
 STATUS_DATA = {
     "sigLevel": "3",
@@ -33,9 +35,6 @@ LAN_DATA = {
     "IPInterfaceSubnetMask": "255.255.255.0",
     "DHCPServerEnable": "1",
 }
-
-VALID_STYLES = {"border", "title", "key", "value", "sms_unread", "sms_read", "empty"}
-
 
 class TestRenderDashboard:
     def test_returns_styled_lines(self):
@@ -167,6 +166,34 @@ class TestDashboardSms:
         lines = render_dashboard(STATUS_DATA, [], WLAN_DATA, LAN_DATA, width=80)
         text = "\n".join(t for t, _ in lines)
         assert "No messages" in text
+
+
+class TestDashboardSmsCursor:
+    def test_selected_message_has_selected_style(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80, sms_cursor=0)
+        for text, style in lines:
+            if "935188" in text:
+                assert style == "sms_selected"
+                break
+
+    def test_non_selected_keeps_original_style(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80, sms_cursor=0)
+        for text, style in lines:
+            if "091234" in text:
+                assert style == "sms_read"
+                break
+
+    def test_selected_content_also_highlighted(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80, sms_cursor=0)
+        for text, style in lines:
+            if "Hello World" in text:
+                assert style == "sms_selected"
+                break
+
+    def test_no_cursor_means_no_selection(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
+        styles = {s for _, s in lines}
+        assert "sms_selected" not in styles
 
 
 class TestDashboardRwd:
