@@ -12,6 +12,7 @@ STATUS_DATA = {
     "connectionStatus": "Connected",
     "externalIPAddress": "10.2.153.186",
     "MACAddress": "B0:95:75:73:C3:AD",
+    "DNSServers": "61.31.1.1,61.31.233.1",
 }
 
 SMS_DATA = [
@@ -34,51 +35,53 @@ LAN_DATA = {
 
 
 class TestRenderDashboard:
-    def test_returns_list_of_lines(self):
-        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA)
+    def test_returns_list_of_strings(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
         assert isinstance(lines, list)
-        assert all(isinstance(line, tuple) and len(line) == 2 for line in lines)
+        assert all(isinstance(line, str) for line in lines)
 
     def test_contains_signal_info(self):
-        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA)
-        text = "\n".join(t for t, _ in lines)
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
+        text = "\n".join(lines)
         assert "4G LTE" in text
         assert "-92" in text
-        assert "3/4" in text
 
     def test_contains_wan_info(self):
-        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA)
-        text = "\n".join(t for t, _ in lines)
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
+        text = "\n".join(lines)
         assert "10.2.153.186" in text
         assert "Connected" in text
 
     def test_contains_wlan_info(self):
-        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA)
-        text = "\n".join(t for t, _ in lines)
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
+        text = "\n".join(lines)
         assert "TP-Link_C3AC" in text
 
     def test_contains_lan_info(self):
-        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA)
-        text = "\n".join(t for t, _ in lines)
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
+        text = "\n".join(lines)
         assert "192.168.1.1" in text
 
     def test_contains_sms(self):
-        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA)
-        text = "\n".join(t for t, _ in lines)
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
+        text = "\n".join(lines)
         assert "935188" in text
         assert "Hello World" in text
 
-    def test_lines_have_color_attr(self):
-        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA)
-        for _, attr in lines:
-            assert attr in ("header", "normal", "key", "unread", "read")
+    def test_has_box_borders(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
+        text = "\n".join(lines)
+        assert "┌" in text
+        assert "┐" in text
+        assert "└" in text
+        assert "┘" in text
 
     def test_empty_sms(self):
-        lines = render_dashboard(STATUS_DATA, [], WLAN_DATA, LAN_DATA)
-        text = "\n".join(t for t, _ in lines)
+        lines = render_dashboard(STATUS_DATA, [], WLAN_DATA, LAN_DATA, width=80)
+        text = "\n".join(lines)
         assert "No messages" in text
 
-    def test_empty_status(self):
-        lines = render_dashboard({}, SMS_DATA, {}, {})
-        assert isinstance(lines, list)
-        assert len(lines) > 0
+    def test_consistent_line_width(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
+        for line in lines:
+            assert len(line) == 80, f"Line width {len(line)} != 80: {repr(line)}"

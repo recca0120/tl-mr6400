@@ -1,81 +1,93 @@
+from tl_mr6400.panel import Panel, PanelGrid
+
 NET_TYPES = {"0": "No Service", "1": "2G", "2": "3G", "3": "4G LTE"}
 
 
 def render_dashboard(
-    status: dict, sms: list[dict], wlan: dict, lan: dict
-) -> list[tuple[str, str]]:
-    lines: list[tuple[str, str]] = []
+    status: dict, sms: list[dict], wlan: dict, lan: dict, width: int = 80
+) -> list[str]:
+    half = width // 2
+    top_h = 10
+    bot_h = 6
 
-    _render_status(lines, status)
-    lines.append(("", "normal"))
-    _render_wlan(lines, wlan)
-    lines.append(("", "normal"))
-    _render_lan(lines, lan)
-    lines.append(("", "normal"))
-    _render_sms(lines, sms)
+    lte_panel = _build_lte_panel(status, half, top_h)
+    wan_panel = _build_wan_panel(status, width - half, top_h)
+    wlan_panel = _build_wlan_panel(wlan, half, bot_h)
+    lan_panel = _build_lan_panel(lan, width - half, bot_h)
+    sms_panel = _build_sms_panel(sms, width, 4 + min(len(sms), 5) * 2)
+
+    lines = []
+    lines.extend(PanelGrid.horizontal([lte_panel, wan_panel]))
+    lines.extend(PanelGrid.horizontal([wlan_panel, lan_panel]))
+    lines.extend(sms_panel.render())
 
     return lines
 
 
-def _kv(lines, key, value, max_key=15):
-    lines.append((f"  {key.ljust(max_key)} : {value}", "key"))
-
-
-def _render_status(lines, status):
-    lines.append(("=== LTE Signal ===", "header"))
+def _build_lte_panel(status: dict, width: int, height: int) -> Panel:
+    p = Panel("LTE Signal", width, height)
     if not status:
-        lines.append(("  No data", "normal"))
-        return
+        p.add("Status", "No data")
+        return p
     net = NET_TYPES.get(status.get("netType", ""), status.get("netType", "?"))
-    _kv(lines, "Network Type", net)
-    _kv(lines, "Signal Level", f'{status.get("sigLevel", "?")}/4')
-    _kv(lines, "RSRP", f'{status.get("rfInfoRsrp", "?")} dBm')
-    _kv(lines, "RSRQ", f'{status.get("rfInfoRsrq", "?")} dB')
-    _kv(lines, "SNR", f'{status.get("rfInfoSnr", "?")} dB')
-    _kv(lines, "Band", status.get("rfInfoBand", "?"))
-
-    lines.append(("", "normal"))
-    lines.append(("=== WAN Connection ===", "header"))
-    _kv(lines, "Status", status.get("connectionStatus", "?"))
-    _kv(lines, "IP Address", status.get("externalIPAddress", "?"))
-    _kv(lines, "MAC Address", status.get("MACAddress", "?"))
+    p.add("Network", net)
+    p.add("Signal", f'{status.get("sigLevel", "?")}/4')
+    p.add("RSRP", f'{status.get("rfInfoRsrp", "?")} dBm')
+    p.add("RSRQ", f'{status.get("rfInfoRsrq", "?")} dB')
+    p.add("SNR", f'{status.get("rfInfoSnr", "?")} dB')
+    p.add("Band", status.get("rfInfoBand", "?"))
+    return p
 
 
-def _render_wlan(lines, wlan):
-    lines.append(("=== Wireless ===", "header"))
+def _build_wan_panel(status: dict, width: int, height: int) -> Panel:
+    p = Panel("WAN Connection", width, height)
+    if not status:
+        p.add("Status", "No data")
+        return p
+    p.add("Status", status.get("connectionStatus", "?"))
+    p.add("IP", status.get("externalIPAddress", "?"))
+    p.add("MAC", status.get("MACAddress", "?"))
+    dns = status.get("DNSServers", "")
+    parts = dns.split(",") if dns else []
+    p.add("DNS 1", parts[0] if parts else "?")
+    p.add("DNS 2", parts[1] if len(parts) > 1 else "?")
+    return p
+
+
+def _build_wlan_panel(wlan: dict, width: int, height: int) -> Panel:
+    p = Panel("Wireless", width, height)
     if not wlan:
-        lines.append(("  No data", "normal"))
-        return
-    _kv(lines, "SSID", wlan.get("SSID", "?"))
-    _kv(lines, "Radio", "On" if wlan.get("enable") == "1" else "Off")
-    _kv(lines, "Band", wlan.get("X_TP_Band", "?"))
-    _kv(lines, "Channel", wlan.get("channel", "?"))
+        p.add("Status", "No data")
+        return p
+    p.add("SSID", wlan.get("SSID", "?"))
+    p.add("Radio", "On" if wlan.get("enable") == "1" else "Off")
+    p.add("Band", wlan.get("X_TP_Band", "?"))
+    p.add("Channel", wlan.get("channel", "?"))
+    return p
 
 
-def _render_lan(lines, lan):
-    lines.append(("=== LAN ===", "header"))
+def _build_lan_panel(lan: dict, width: int, height: int) -> Panel:
+    p = Panel("LAN", width, height)
     if not lan:
-        lines.append(("  No data", "normal"))
-        return
-    _kv(lines, "IP Address", lan.get("IPInterfaceIPAddress", "?"))
-    _kv(lines, "Subnet Mask", lan.get("IPInterfaceSubnetMask", "?"))
+        p.add("Status", "No data")
+        return p
+    p.add("IP", lan.get("IPInterfaceIPAddress", "?"))
+    p.add("Mask", lan.get("IPInterfaceSubnetMask", "?"))
     dhcp = "On" if lan.get("DHCPServerEnable") == "1" else "Off"
-    _kv(lines, "DHCP", dhcp)
+    p.add("DHCP", dhcp)
+    return p
 
 
-def _render_sms(lines, sms):
-    lines.append(("=== SMS (Recent) ===", "header"))
+def _build_sms_panel(sms: list[dict], width: int, height: int) -> Panel:
+    p = Panel("SMS (Recent)", width, max(height, 4))
     if not sms:
-        lines.append(("  No messages", "normal"))
-        return
+        p.add("", "No messages")
+        return p
     for msg in sms[:5]:
-        unread = msg.get("unread") == "1"
-        attr = "unread" if unread else "read"
-        marker = "*" if unread else " "
+        marker = "*" if msg.get("unread") == "1" else " "
         sender = msg.get("from", "?")
         time = msg.get("receivedTime", "?")
         content = msg.get("content", "")
-        if len(content) > 60:
-            content = content[:57] + "..."
-        lines.append((f" {marker} {time}  {sender}", attr))
-        lines.append((f"    {content}", attr))
+        p.add(f"{marker} {time}", sender)
+        p.add("", content)
+    return p
