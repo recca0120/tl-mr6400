@@ -3,10 +3,13 @@ class Panel:
         self.title = title
         self.width = width
         self.height = height
-        self._rows: list[tuple[str, str]] = []
+        self._rows: list[tuple[str, str] | str] = []
 
     def add(self, key: str, value: str):
         self._rows.append((key, value))
+
+    def add_raw(self, text: str):
+        self._rows.append(text)
 
     def render(self) -> list[str]:
         w = self.width
@@ -17,16 +20,9 @@ class Panel:
         left_bar = bar_len // 2
         right_bar = bar_len - left_bar
         top = f"┌{'─' * left_bar}{title_text}{'─' * right_bar}┐"
-
         bottom = f"└{'─' * inner}┘"
 
-        content_lines = []
-        if self._rows:
-            max_key = max(len(k) for k, _ in self._rows)
-            for key, val in self._rows:
-                text = f" {key.ljust(max_key)}: {val}"
-                text = text[:inner]
-                content_lines.append(f"│{text.ljust(inner)}│")
+        content_lines = self._render_rows(inner)
 
         content_height = self.height - 2
         while len(content_lines) < content_height:
@@ -34,6 +30,23 @@ class Panel:
         content_lines = content_lines[:content_height]
 
         return [top] + content_lines + [bottom]
+
+    def _render_rows(self, inner: int) -> list[str]:
+        max_key = max(
+            (len(row[0]) for row in self._rows if isinstance(row, tuple)),
+            default=0,
+        )
+
+        lines = []
+        for row in self._rows:
+            if isinstance(row, str):
+                text = row[:inner]
+            else:
+                key, val = row
+                text = f" {key.ljust(max_key)}: {val}"
+                text = text[:inner]
+            lines.append(f"│{text.ljust(inner)}│")
+        return lines
 
 
 class PanelGrid:

@@ -1,24 +1,33 @@
 from tl_mr6400.panel import Panel, PanelGrid
 
 NET_TYPES = {"0": "No Service", "1": "2G", "2": "3G", "3": "4G LTE"}
+MIN_SIDE_BY_SIDE = 60
 
 
 def render_dashboard(
     status: dict, sms: list[dict], wlan: dict, lan: dict, width: int = 80
 ) -> list[str]:
-    half = width // 2
-    top_h = 10
-    bot_h = 6
+    wide = width >= MIN_SIDE_BY_SIDE
 
-    lte_panel = _build_lte_panel(status, half, top_h)
-    wan_panel = _build_wan_panel(status, width - half, top_h)
-    wlan_panel = _build_wlan_panel(wlan, half, bot_h)
-    lan_panel = _build_lan_panel(lan, width - half, bot_h)
-    sms_panel = _build_sms_panel(sms, width, 4 + min(len(sms), 5) * 2)
+    if wide:
+        half = width // 2
+        other = width - half
+        lte = _build_lte_panel(status, half, 8)
+        wan = _build_wan_panel(status, other, 8)
+        wl = _build_wlan_panel(wlan, half, 6)
+        la = _build_lan_panel(lan, other, 6)
+        lines = []
+        lines.extend(PanelGrid.horizontal([lte, wan]))
+        lines.extend(PanelGrid.horizontal([wl, la]))
+    else:
+        lte = _build_lte_panel(status, width, 8)
+        wan = _build_wan_panel(status, width, 7)
+        wl = _build_wlan_panel(wlan, width, 6)
+        la = _build_lan_panel(lan, width, 5)
+        lines = PanelGrid.vertical([lte, wan, wl, la])
 
-    lines = []
-    lines.extend(PanelGrid.horizontal([lte_panel, wan_panel]))
-    lines.extend(PanelGrid.horizontal([wlan_panel, lan_panel]))
+    sms_h = max(4, 2 + min(len(sms), 5) * 2)
+    sms_panel = _build_sms_panel(sms, width, sms_h)
     lines.extend(sms_panel.render())
 
     return lines
@@ -79,15 +88,15 @@ def _build_lan_panel(lan: dict, width: int, height: int) -> Panel:
 
 
 def _build_sms_panel(sms: list[dict], width: int, height: int) -> Panel:
-    p = Panel("SMS (Recent)", width, max(height, 4))
+    p = Panel("SMS", width, height)
     if not sms:
         p.add("", "No messages")
         return p
     for msg in sms[:5]:
-        marker = "*" if msg.get("unread") == "1" else " "
+        marker = "●" if msg.get("unread") == "1" else " "
         sender = msg.get("from", "?")
         time = msg.get("receivedTime", "?")
         content = msg.get("content", "")
-        p.add(f"{marker} {time}", sender)
-        p.add("", content)
+        p.add_raw(f" {marker} {sender:<12} {time}")
+        p.add_raw(f"   {content}")
     return p

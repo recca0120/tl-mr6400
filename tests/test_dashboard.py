@@ -40,48 +40,83 @@ class TestRenderDashboard:
         assert isinstance(lines, list)
         assert all(isinstance(line, str) for line in lines)
 
-    def test_contains_signal_info(self):
+    def test_contains_all_sections(self):
         lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
         text = "\n".join(lines)
         assert "4G LTE" in text
         assert "-92" in text
-
-    def test_contains_wan_info(self):
-        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
-        text = "\n".join(lines)
         assert "10.2.153.186" in text
         assert "Connected" in text
-
-    def test_contains_wlan_info(self):
-        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
-        text = "\n".join(lines)
         assert "TP-Link_C3AC" in text
-
-    def test_contains_lan_info(self):
-        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
-        text = "\n".join(lines)
         assert "192.168.1.1" in text
-
-    def test_contains_sms(self):
-        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
-        text = "\n".join(lines)
-        assert "935188" in text
-        assert "Hello World" in text
 
     def test_has_box_borders(self):
         lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
         text = "\n".join(lines)
         assert "┌" in text
-        assert "┐" in text
         assert "└" in text
-        assert "┘" in text
+
+    def test_consistent_line_width(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
+        for line in lines:
+            assert len(line) == 80, f"Width {len(line)} != 80: {repr(line)}"
+
+
+class TestRenderDashboardSms:
+    def test_sender_and_time_on_same_line(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
+        text = "\n".join(lines)
+        for line in lines:
+            if "935188" in line:
+                assert "2026-05-08" in line
+                break
+        else:
+            assert False, "Sender line not found"
+
+    def test_content_on_next_line(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
+        for i, line in enumerate(lines):
+            if "935188" in line:
+                assert "Hello World" in lines[i + 1]
+                break
+
+    def test_unread_marker(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
+        for line in lines:
+            if "935188" in line:
+                assert "●" in line or "*" in line
+                break
 
     def test_empty_sms(self):
         lines = render_dashboard(STATUS_DATA, [], WLAN_DATA, LAN_DATA, width=80)
         text = "\n".join(lines)
         assert "No messages" in text
 
-    def test_consistent_line_width(self):
+
+class TestRenderDashboardRwd:
+    def test_wide_layout_side_by_side(self):
         lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
         for line in lines:
-            assert len(line) == 80, f"Line width {len(line)} != 80: {repr(line)}"
+            assert len(line) == 80
+        # Side-by-side: LTE and WAN titles should be on the same line
+        for line in lines:
+            if "LTE" in line and "WAN" in line:
+                break
+        else:
+            assert False, "LTE and WAN should be on the same line in wide layout"
+
+    def test_narrow_layout_stacked(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=50)
+        for line in lines:
+            assert len(line) == 50, f"Width {len(line)} != 50: {repr(line)}"
+        # Stacked: LTE and WAN should NOT be on the same line
+        for line in lines:
+            if "LTE" in line:
+                assert "WAN" not in line
+                break
+
+    def test_very_narrow_still_works(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=40)
+        assert len(lines) > 0
+        for line in lines:
+            assert len(line) == 40

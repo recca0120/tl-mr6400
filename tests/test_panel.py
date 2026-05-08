@@ -28,6 +28,13 @@ class TestPanel:
         for line in lines:
             assert len(line) == 20
 
+    def test_add_raw_renders_freeform_text(self):
+        p = Panel("T", width=30, height=5)
+        p.add_raw("  hello world")
+        lines = p.render()
+        content = "".join(lines)
+        assert "hello world" in content
+
     def test_pads_empty_rows(self):
         p = Panel("T", width=20, height=6)
         p.add("A", "1")
