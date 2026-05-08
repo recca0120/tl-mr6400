@@ -92,6 +92,9 @@ func (c *Client) queryMerged(actTypes, data string) map[string]string {
 
 func (c *Client) Login() error {
 	r := c.http.Get(fmt.Sprintf("%s/cgi/getParm", c.url), c.headers())
+	if err := checkResponse(r, "get RSA keys"); err != nil {
+		return err
+	}
 	ee, nn, err := parser.ParseRSAKeys(r.Body)
 	if err != nil {
 		return err
@@ -104,16 +107,32 @@ func (c *Client) Login() error {
 
 	loginURL := fmt.Sprintf("%s/cgi/login?UserName=%s&Passwd=%s&Action=1&LoginStatus=0", c.url, encUser, encPass)
 	r = c.http.Post(loginURL, "", c.headers())
+	if err := checkResponse(r, "login"); err != nil {
+		return err
+	}
 	if !strings.Contains(r.Body, loginSuccessToken) {
 		return fmt.Errorf("login failed: %s", strings.TrimSpace(r.Body))
 	}
 
 	r = c.http.Get(c.url+"/", c.headers())
+	if err := checkResponse(r, "get token"); err != nil {
+		return err
+	}
 	token, err := parser.ParseToken(r.Body)
 	if err != nil {
 		return err
 	}
 	c.token = token
+	return nil
+}
+
+func checkResponse(r HTTPResponse, context string) error {
+	if r.Err != nil {
+		return fmt.Errorf("%s: %w", context, r.Err)
+	}
+	if r.StatusCode != 200 {
+		return fmt.Errorf("%s: HTTP %d", context, r.StatusCode)
+	}
 	return nil
 }
 

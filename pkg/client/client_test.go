@@ -1,6 +1,7 @@
 package client
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -92,6 +93,38 @@ func TestLogin_MissingToken(t *testing.T) {
 	err := c.Login()
 	if err == nil {
 		t.Error("expected error, got nil")
+	}
+}
+
+func TestLogin_HTTPError_ShowsRealError(t *testing.T) {
+	mock := &mockHTTP{
+		getResponses: []HTTPResponse{
+			{StatusCode: 0, Body: "", Err: fmt.Errorf("dial tcp 192.168.1.1:80: connect: no route to host")},
+		},
+	}
+	c := New("http://192.168.1.1", "admin", WithHTTP(mock))
+	err := c.Login()
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "no route to host") {
+		t.Errorf("error should contain real cause, got: %v", err)
+	}
+}
+
+func TestLogin_403_ShowsStatusCode(t *testing.T) {
+	mock := &mockHTTP{
+		getResponses: []HTTPResponse{
+			{StatusCode: 403, Body: "Forbidden"},
+		},
+	}
+	c := New("http://192.168.1.1", "admin", WithHTTP(mock))
+	err := c.Login()
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "403") {
+		t.Errorf("error should mention status code, got: %v", err)
 	}
 }
 
