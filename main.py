@@ -1,7 +1,9 @@
 import argparse
+import json as json_mod
 import os
 from pathlib import Path
 from tl_mr6400.client import TlMr6400Client
+from tl_mr6400.formatter import Table
 
 
 def load_dotenv(path=".env"):
@@ -25,9 +27,15 @@ def create_client():
     return client
 
 
+NET_TYPES = {"0": "No Service", "1": "2G", "2": "3G", "3": "4G LTE"}
+
+
 def cmd_sms(args):
     client = create_client()
     messages = client.get_sms(page=args.page)
+    if args.json:
+        print(json_mod.dumps(messages, ensure_ascii=False, indent=2))
+        return
     if not messages:
         print("No SMS messages found.")
         return
@@ -39,37 +47,43 @@ def cmd_sms(args):
 
 
 def cmd_status(args):
-    NET_TYPES = {"0": "No Service", "1": "2G", "2": "3G", "3": "4G LTE"}
-
     client = create_client()
     status = client.get_status()
+    if args.json:
+        print(json_mod.dumps(status, ensure_ascii=False, indent=2))
+        return
     if not status:
         print("Failed to get status.")
         return
 
-    print("=== LTE Signal ===")
-    print(f'  Network Type : {NET_TYPES.get(status.get("netType", ""), status.get("netType", "?"))}')
-    print(f'  Signal Level : {status.get("sigLevel", "?")}/4')
-    print(f'  RSSI         : {status.get("rfInfoRssi", "?")} dBm')
-    print(f'  RSRP         : {status.get("rfInfoRsrp", "?")} dBm')
-    print(f'  RSRQ         : {status.get("rfInfoRsrq", "?")} dB')
-    print(f'  SNR          : {status.get("rfInfoSnr", "?")} dB')
-    print(f'  Band         : {status.get("rfInfoBand", "?")}')
-    print()
-    print("=== WAN Connection ===")
-    print(f'  Status       : {status.get("connectionStatus", "?")}')
-    print(f'  IP Address   : {status.get("externalIPAddress", "?")}')
-    print(f'  Gateway      : {status.get("defaultGateway", "?")}')
     dns = status.get("DNSServers", "")
     parts = dns.split(",") if dns else []
-    print(f'  Primary DNS  : {parts[0] if parts else "?"}')
-    print(f'  Secondary DNS: {parts[1] if len(parts) > 1 else "?"}')
-    print(f'  MAC Address  : {status.get("MACAddress", "?")}')
+
+    t = Table()
+    t.section("LTE Signal")
+    t.add("Network Type", NET_TYPES.get(status.get("netType", ""), status.get("netType", "?")))
+    t.add("Signal Level", f'{status.get("sigLevel", "?")}/4')
+    t.add("RSSI", f'{status.get("rfInfoRssi", "?")} dBm')
+    t.add("RSRP", f'{status.get("rfInfoRsrp", "?")} dBm')
+    t.add("RSRQ", f'{status.get("rfInfoRsrq", "?")} dB')
+    t.add("SNR", f'{status.get("rfInfoSnr", "?")} dB')
+    t.add("Band", status.get("rfInfoBand", "?"))
+    t.section("WAN Connection")
+    t.add("Status", status.get("connectionStatus", "?"))
+    t.add("IP Address", status.get("externalIPAddress", "?"))
+    t.add("Gateway", status.get("defaultGateway", "?"))
+    t.add("Primary DNS", parts[0] if parts else "?")
+    t.add("Secondary DNS", parts[1] if len(parts) > 1 else "?")
+    t.add("MAC Address", status.get("MACAddress", "?"))
+    print(t.render(), end="")
 
 
 def cmd_wlan(args):
     client = create_client()
     wlan = client.get_wlan()
+    if args.json:
+        print(json_mod.dumps(wlan, ensure_ascii=False, indent=2))
+        return
     if not wlan:
         print("Failed to get WLAN info.")
         return
@@ -77,37 +91,45 @@ def cmd_wlan(args):
     enabled = "Enabled" if wlan.get("enable") == "1" else "Disabled"
     hidden = "On" if wlan.get("SSIDAdvertisementEnabled") == "0" else "Off"
 
-    print("=== Wireless ===")
-    print(f'  SSID         : {wlan.get("SSID", "?")}')
-    print(f'  Radio        : {enabled}')
-    print(f'  Band         : {wlan.get("X_TP_Band", "?")}')
-    print(f'  Channel      : {wlan.get("channel", "?")}')
-    print(f'  Bandwidth    : {wlan.get("X_TP_Bandwidth", "?")}')
-    print(f'  Hide SSID    : {hidden}')
-    print(f'  TX Power     : {wlan.get("transmitPower", "?")}%')
-    print(f'  Clients      : {wlan.get("totalAssociations", "?")}')
+    t = Table()
+    t.section("Wireless")
+    t.add("SSID", wlan.get("SSID", "?"))
+    t.add("Radio", enabled)
+    t.add("Band", wlan.get("X_TP_Band", "?"))
+    t.add("Channel", wlan.get("channel", "?"))
+    t.add("Bandwidth", wlan.get("X_TP_Bandwidth", "?"))
+    t.add("Hide SSID", hidden)
+    t.add("TX Power", f'{wlan.get("transmitPower", "?")}%')
+    t.add("Clients", wlan.get("totalAssociations", "?"))
+    print(t.render(), end="")
 
 
 def cmd_lan(args):
     client = create_client()
     lan = client.get_lan()
+    if args.json:
+        print(json_mod.dumps(lan, ensure_ascii=False, indent=2))
+        return
     if not lan:
         print("Failed to get LAN info.")
         return
 
     dhcp = "On" if lan.get("DHCPServerEnable") == "1" else "Off"
 
-    print("=== LAN ===")
-    print(f'  IP Address   : {lan.get("IPInterfaceIPAddress", "?")}')
-    print(f'  Subnet Mask  : {lan.get("IPInterfaceSubnetMask", "?")}')
-    print(f'  MAC Address  : {lan.get("X_TP_MACAddress", "?")}')
-    print(f'  DHCP         : {dhcp}')
+    t = Table()
+    t.section("LAN")
+    t.add("IP Address", lan.get("IPInterfaceIPAddress", "?"))
+    t.add("Subnet Mask", lan.get("IPInterfaceSubnetMask", "?"))
+    t.add("MAC Address", lan.get("X_TP_MACAddress", "?"))
+    t.add("DHCP", dhcp)
     if dhcp == "On":
-        print(f'  DHCP Range   : {lan.get("minAddress", "?")} - {lan.get("maxAddress", "?")}')
+        t.add("DHCP Range", f'{lan.get("minAddress", "?")} - {lan.get("maxAddress", "?")}')
+    print(t.render(), end="")
 
 
 def main():
     parser = argparse.ArgumentParser(description="TL-MR6400 CLI")
+    parser.add_argument("--json", action="store_true", help="Output as JSON")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     sms_parser = subparsers.add_parser("sms", help="Read SMS messages")
