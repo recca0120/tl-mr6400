@@ -1,7 +1,13 @@
-from tl_mr6400.panel import Panel, PanelGrid
+import re
+from tl_mr6400.panel import Panel, PanelGrid, display_width
+from tl_mr6400.formatter import signal_bar, level_bar
 
 NET_TYPES = {"0": "No Service", "1": "2G", "2": "3G", "3": "4G LTE"}
 MIN_SIDE_BY_SIDE = 60
+
+
+def _sanitize(text: str) -> str:
+    return re.sub(r"[\x00-\x1f\x7f]", "", text)
 
 
 def render_dashboard(
@@ -12,22 +18,21 @@ def render_dashboard(
     if wide:
         half = width // 2
         other = width - half
-        lte = _build_lte_panel(status, half, 8)
-        wan = _build_wan_panel(status, other, 8)
+        lte = _build_lte_panel(status, half, 9)
+        wan = _build_wan_panel(status, other, 9)
         wl = _build_wlan_panel(wlan, half, 6)
         la = _build_lan_panel(lan, other, 6)
         lines = []
         lines.extend(PanelGrid.horizontal([lte, wan]))
         lines.extend(PanelGrid.horizontal([wl, la]))
     else:
-        lte = _build_lte_panel(status, width, 8)
+        lte = _build_lte_panel(status, width, 9)
         wan = _build_wan_panel(status, width, 7)
         wl = _build_wlan_panel(wlan, width, 6)
         la = _build_lan_panel(lan, width, 5)
         lines = PanelGrid.vertical([lte, wan, wl, la])
 
-    sms_h = max(4, 2 + min(len(sms), 5) * 2)
-    sms_panel = _build_sms_panel(sms, width, sms_h)
+    sms_panel = _build_sms_panel(sms, width)
     lines.extend(sms_panel.render())
 
     return lines
@@ -40,10 +45,14 @@ def _build_lte_panel(status: dict, width: int, height: int) -> Panel:
         return p
     net = NET_TYPES.get(status.get("netType", ""), status.get("netType", "?"))
     p.add("Network", net)
-    p.add("Signal", f'{status.get("sigLevel", "?")}/4')
-    p.add("RSRP", f'{status.get("rfInfoRsrp", "?")} dBm')
-    p.add("RSRQ", f'{status.get("rfInfoRsrq", "?")} dB')
-    p.add("SNR", f'{status.get("rfInfoSnr", "?")} dB')
+    sig = int(status.get("sigLevel", 0))
+    p.add("Signal", signal_bar(sig, 4))
+    rsrp = int(status.get("rfInfoRsrp", -140))
+    p.add("RSRP", level_bar(rsrp, -140, -44, width=10) + " dBm")
+    rsrq = int(status.get("rfInfoRsrq", -20))
+    p.add("RSRQ", level_bar(rsrq, -20, -3, width=10) + " dB")
+    snr = int(status.get("rfInfoSnr", 0))
+    p.add("SNR", level_bar(snr, -5, 40, width=10) + " dB")
     p.add("Band", status.get("rfInfoBand", "?"))
     return p
 
@@ -87,16 +96,45 @@ def _build_lan_panel(lan: dict, width: int, height: int) -> Panel:
     return p
 
 
-def _build_sms_panel(sms: list[dict], width: int, height: int) -> Panel:
-    p = Panel("SMS", width, height)
+def _wrap_text(text: str, max_width: int) -> list[str]:
+    lines = []
+    while display_width(text) > max_width:
+        cut = 0
+        w = 0
+        for ch in text:
+            import unicodedata
+            cw = 2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1
+            if w + cw > max_width:
+                break
+            w += cw
+            cut += 1
+        lines.append(text[:cut])
+        text = text[cut:]
+    if text:
+        lines.append(text)
+    return lines
+
+
+def _build_sms_panel(sms: list[dict], width: int) -> Panel:
+    inner = width - 2
+    content_indent = 3
+    content_width = inner - content_indent
+
+    raw_lines: list[str] = []
     if not sms:
-        p.add("", "No messages")
-        return p
-    for msg in sms[:5]:
-        marker = "●" if msg.get("unread") == "1" else " "
-        sender = msg.get("from", "?")
-        time = msg.get("receivedTime", "?")
-        content = msg.get("content", "")
-        p.add_raw(f" {marker} {sender:<12} {time}")
-        p.add_raw(f"   {content}")
+        raw_lines.append("  No messages")
+    else:
+        for msg in sms[:5]:
+            marker = "●" if msg.get("unread") == "1" else " "
+            sender = msg.get("from", "?")
+            time = msg.get("receivedTime", "?")
+            raw_lines.append(f" {marker} {sender:<12} {time}")
+            content = _sanitize(msg.get("content", ""))
+            for wrapped in _wrap_text(content, content_width):
+                raw_lines.append(f"   {wrapped}")
+
+    height = len(raw_lines) + 2
+    p = Panel("SMS", width, height)
+    for line in raw_lines:
+        p.add_raw(line)
     return p

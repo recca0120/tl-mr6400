@@ -1,4 +1,4 @@
-from tl_mr6400.formatter import colorize, Table
+from tl_mr6400.formatter import colorize, Table, signal_bar, level_bar
 
 
 class TestColorize:
@@ -55,3 +55,47 @@ class TestTable:
     def test_empty_table(self):
         t = Table()
         assert t.render() == ""
+
+
+class TestSignalBar:
+    def test_full(self):
+        result = signal_bar(4, 4)
+        assert "▰" * 4 in result
+        assert "▱" not in result
+
+    def test_empty(self):
+        result = signal_bar(0, 4)
+        assert "▱" * 4 in result
+        assert "▰" not in result
+
+    def test_partial(self):
+        result = signal_bar(2, 4)
+        assert result.count("▰") == 2
+        assert result.count("▱") == 2
+
+    def test_includes_fraction(self):
+        result = signal_bar(3, 4)
+        assert "3/4" in result
+
+
+class TestLevelBar:
+    def test_good_rsrp(self):
+        result = level_bar(-70, -140, -44, width=10)
+        assert "█" in result
+
+    def test_bad_rsrp(self):
+        result = level_bar(-130, -140, -44, width=10)
+        filled = result.count("█")
+        assert filled <= 2
+
+    def test_includes_value(self):
+        result = level_bar(-92, -140, -44, width=10)
+        assert "-92" in result
+
+    def test_clamps_above_max(self):
+        result = level_bar(-30, -140, -44, width=10)
+        assert "█" * 10 in result
+
+    def test_clamps_below_min(self):
+        result = level_bar(-150, -140, -44, width=10)
+        assert "░" * 10 in result

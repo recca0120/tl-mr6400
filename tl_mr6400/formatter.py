@@ -52,3 +52,15 @@ class Table:
                 lines.append(f"  {colorize(padded_key, color='white', bold=True)} : {value}")
 
         return "\n".join(lines) + "\n"
+
+
+def signal_bar(level: int, max_level: int) -> str:
+    filled = max(0, min(level, max_level))
+    return "▰" * filled + "▱" * (max_level - filled) + f" {level}/{max_level}"
+
+
+def level_bar(value: int, min_val: int, max_val: int, width: int = 10) -> str:
+    ratio = (value - min_val) / (max_val - min_val)
+    ratio = max(0.0, min(1.0, ratio))
+    filled = round(ratio * width)
+    return "█" * filled + "░" * (width - filled) + f" {value}"

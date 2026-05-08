@@ -51,6 +51,16 @@ class TestRenderDashboard:
         assert "TP-Link_C3AC" in text
         assert "192.168.1.1" in text
 
+    def test_signal_has_bar_graphic(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
+        text = "\n".join(lines)
+        assert "▰" in text or "█" in text
+
+    def test_rsrp_has_level_bar(self):
+        lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
+        text = "\n".join(lines)
+        assert "█" in text or "░" in text
+
     def test_has_box_borders(self):
         lines = render_dashboard(STATUS_DATA, SMS_DATA, WLAN_DATA, LAN_DATA, width=80)
         text = "\n".join(lines)
@@ -87,6 +97,23 @@ class TestRenderDashboardSms:
             if "935188" in line:
                 assert "●" in line or "*" in line
                 break
+
+    def test_long_sms_wraps_instead_of_truncate(self):
+        long_sms = [
+            {"from": "935188", "content": "A" * 200, "receivedTime": "2026-05-08 12:06:08", "unread": "1"},
+        ]
+        lines = render_dashboard(STATUS_DATA, long_sms, WLAN_DATA, LAN_DATA, width=80)
+        content_lines = [l for l in lines if "AAAA" in l]
+        assert len(content_lines) >= 2
+
+    def test_strips_control_characters(self):
+        ctrl_sms = [
+            {"from": "123", "content": "hello\r\nworld\r", "receivedTime": "2026-01-01 00:00", "unread": "0"},
+        ]
+        lines = render_dashboard(STATUS_DATA, ctrl_sms, WLAN_DATA, LAN_DATA, width=80)
+        for line in lines:
+            assert "\r" not in line
+            assert "\n" not in line
 
     def test_chinese_sms_consistent_width(self):
         chinese_sms = [
