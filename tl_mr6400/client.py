@@ -1,5 +1,5 @@
 from tl_mr6400.http import HttpSession
-from tl_mr6400.parser import parse_rsa_keys, parse_token, parse_sms_response
+from tl_mr6400.parser import parse_rsa_keys, parse_token, parse_entries
 from tl_mr6400.encryption import encrypt_credentials
 
 
@@ -20,6 +20,15 @@ class TlMr6400Client:
         if self._token:
             h["TokenID"] = self._token
         return h
+
+    def _query(self, act_types: str, data: str) -> list[dict]:
+        headers = {**self._headers(), "Content-Type": "text/plain"}
+        r = self._session.post(
+            f"{self.url}/cgi?{act_types}", data=data, headers=headers, timeout=5
+        )
+        if r.status_code != 200:
+            return []
+        return parse_entries(r.text)
 
     def login(self):
         r = self._session.get(
@@ -44,16 +53,22 @@ class TlMr6400Client:
             raise LoginError(str(e)) from e
 
     def get_sms(self, page: int = 1) -> list[dict]:
-        headers = {**self._headers(), "Content-Type": "text/plain"}
         data = (
             f"[LTE_SMS_RECVMSGBOX#0,0,0,0,0,0#0,0,0,0,0,0]0,1\r\nPageNumber={page}\r\n"
             f"[LTE_SMS_RECVMSGENTRY#0,0,0,0,0,0#0,0,0,0,0,0]1,5\r\n"
             f"index\r\nfrom\r\ncontent\r\nreceivedTime\r\nunread\r\n"
         )
-        r = self._session.post(
-            f"{self.url}/cgi?2&5", data=data, headers=headers, timeout=5
-        )
-        if r.status_code != 200:
-            return []
+        return self._query("2&5", data)
 
-        return parse_sms_response(r.text)
+    def get_status(self) -> dict:
+        data = (
+            "[LTE_NET_STATUS#0,0,0,0,0,0#0,0,0,0,0,0]0,0\r\n"
+            "[WAN_IP_CONN#0,0,0,0,0,0#0,0,0,0,0,0]1,0\r\n"
+        )
+        entries = self._query("5&5", data)
+        if not entries:
+            return {}
+        merged = {}
+        for entry in entries:
+            merged.update(entry)
+        return merged

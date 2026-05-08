@@ -16,7 +16,7 @@ def parse_token(html: str) -> str:
     return match.group(1)
 
 
-def parse_sms_response(text: str) -> list[dict]:
+def parse_entries(text: str) -> list[dict]:
     messages = []
     current = {}
     for line in text.split("\n"):

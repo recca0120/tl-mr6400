@@ -1,4 +1,5 @@
-from tl_mr6400.parser import parse_sms_response, parse_rsa_keys, parse_token
+import pytest
+from tl_mr6400.parser import parse_rsa_keys, parse_token, parse_entries
 
 
 class TestParseRsaKeys:
@@ -14,8 +15,6 @@ class TestParseRsaKeys:
         assert nn == "AABB"
 
     def test_raises_on_missing_keys(self):
-        import pytest
-
         with pytest.raises(ValueError):
             parse_rsa_keys("some garbage")
 
@@ -30,13 +29,11 @@ class TestParseToken:
         assert parse_token(html) == "abc123def"
 
     def test_raises_on_missing_token(self):
-        import pytest
-
         with pytest.raises(ValueError):
             parse_token("<html>no token here</html>")
 
 
-class TestParseSmsResponse:
+class TestParseEntries:
     def test_parses_multiple_messages(self):
         response = (
             "[1,0,0,0,0,0]1\n"
@@ -53,26 +50,66 @@ class TestParseSmsResponse:
             "unread=0\n"
             "[error]0\n"
         )
-        messages = parse_sms_response(response)
-        assert len(messages) == 2
-        assert messages[0]["from"] == "935188"
-        assert messages[0]["content"] == "Hello World"
-        assert messages[0]["unread"] == "1"
-        assert messages[1]["from"] == "091234"
-        assert messages[1]["unread"] == "0"
+        entries = parse_entries(response)
+        assert len(entries) == 2
+        assert entries[0]["from"] == "935188"
+        assert entries[0]["content"] == "Hello World"
+        assert entries[0]["unread"] == "1"
+        assert entries[1]["from"] == "091234"
+        assert entries[1]["unread"] == "0"
 
-    def test_returns_empty_on_no_messages(self):
-        assert parse_sms_response("[error]0\n") == []
+    def test_returns_empty_on_no_entries(self):
+        assert parse_entries("[error]0\n") == []
 
-    def test_handles_content_with_equals_sign(self):
+    def test_handles_value_with_equals_sign(self):
         response = (
             "[1,0,0,0,0,0]1\n"
-            "index=1\n"
-            "from=123\n"
             "content=a=b=c\n"
-            "receivedTime=2026-01-01 00:00:00\n"
-            "unread=0\n"
             "[error]0\n"
         )
-        messages = parse_sms_response(response)
-        assert messages[0]["content"] == "a=b=c"
+        entries = parse_entries(response)
+        assert entries[0]["content"] == "a=b=c"
+
+    def test_parses_lte_status(self):
+        response = (
+            "[2,1,0,0,0,0]0\n"
+            "sigLevel=2\n"
+            "connStat=4\n"
+            "netType=3\n"
+            "rfInfoRssi=-59\n"
+            "rfInfoRsrp=-92\n"
+            "rfInfoSnr=36\n"
+            "[error]0\n"
+        )
+        entries = parse_entries(response)
+        assert len(entries) == 1
+        assert entries[0]["sigLevel"] == "2"
+        assert entries[0]["rfInfoRssi"] == "-59"
+
+    def test_parses_wan_ip_conn(self):
+        response = (
+            "[2,1,1,0,0,0]1\n"
+            "connectionStatus=Connected\n"
+            "externalIPAddress=10.2.153.186\n"
+            "defaultGateway=10.2.153.185\n"
+            "DNSServers=61.31.1.1,61.31.233.1\n"
+            "[error]0\n"
+        )
+        entries = parse_entries(response)
+        assert entries[0]["externalIPAddress"] == "10.2.153.186"
+        assert entries[0]["DNSServers"] == "61.31.1.1,61.31.233.1"
+
+    def test_parses_mixed_entries(self):
+        response = (
+            "[2,1,0,0,0,0]0\n"
+            "sigLevel=2\n"
+            "connStat=4\n"
+            "[2,1,1,0,0,0]1\n"
+            "connectionStatus=Connected\n"
+            "externalIPAddress=10.2.153.186\n"
+            "[error]0\n"
+        )
+        entries = parse_entries(response)
+        assert len(entries) == 2
+        assert entries[0]["sigLevel"] == "2"
+        assert entries[1]["externalIPAddress"] == "10.2.153.186"

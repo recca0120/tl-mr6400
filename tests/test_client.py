@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock
 import pytest
 from tl_mr6400.client import TlMr6400Client, LoginError
 
@@ -21,6 +21,22 @@ SMS_RESPONSE = (
     "content=Hello\n"
     "receivedTime=2026-05-08 12:06:08\n"
     "unread=1\n"
+    "[error]0\n"
+)
+
+STATUS_RESPONSE = (
+    "[2,1,0,0,0,0]0\n"
+    "sigLevel=2\n"
+    "connStat=4\n"
+    "netType=3\n"
+    "rfInfoRssi=-59\n"
+    "rfInfoRsrp=-92\n"
+    "rfInfoSnr=36\n"
+    "[2,1,1,0,0,0]1\n"
+    "connectionStatus=Connected\n"
+    "externalIPAddress=10.2.153.186\n"
+    "defaultGateway=10.2.153.185\n"
+    "DNSServers=61.31.1.1,61.31.233.1\n"
     "[error]0\n"
 )
 
@@ -103,5 +119,34 @@ class TestGetSms:
         client._token = "my_token"
         client.get_sms()
 
-        headers = session.post.call_args[1].get("headers") or session.post.call_args[0][1] if len(session.post.call_args[0]) > 1 else session.post.call_args[1]["headers"]
+        headers = session.post.call_args[1]["headers"]
         assert headers["TokenID"] == "my_token"
+
+
+class TestGetStatus:
+    def test_returns_lte_and_wan_status(self):
+        session = MagicMock()
+        session.post.return_value = _mock_response(STATUS_RESPONSE)
+
+        client = TlMr6400Client("http://192.168.1.1", "admin", session=session)
+        client._token = "fake_token"
+
+        status = client.get_status()
+
+        assert status["sigLevel"] == "2"
+        assert status["rfInfoRssi"] == "-59"
+        assert status["rfInfoRsrp"] == "-92"
+        assert status["rfInfoSnr"] == "36"
+        assert status["connectionStatus"] == "Connected"
+        assert status["externalIPAddress"] == "10.2.153.186"
+        assert status["defaultGateway"] == "10.2.153.185"
+        assert status["DNSServers"] == "61.31.1.1,61.31.233.1"
+
+    def test_returns_empty_on_http_error(self):
+        session = MagicMock()
+        session.post.return_value = _mock_response(status_code=500)
+
+        client = TlMr6400Client("http://192.168.1.1", "admin", session=session)
+        client._token = "fake_token"
+
+        assert client.get_status() == {}
