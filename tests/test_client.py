@@ -231,33 +231,33 @@ class TestGetLan:
 
 
 class TestSetSmsRead:
-    def test_sends_correct_request(self):
+    def test_sends_correct_request_with_stack(self):
         session = MagicMock()
         session.post.return_value = _mock_response("[error]0\n")
 
         client = TlMr6400Client("http://192.168.1.1", "admin", session=session)
         client._token = "fake_token"
-        client.set_sms_read(124)
+        client.set_sms_read("1,0,0,0,0,0")
 
         call_args = session.post.call_args
         assert "cgi?2" in call_args[0][0]
         data = call_args[1]["data"]
         assert "LTE_SMS_RECVMSGENTRY" in data
-        assert "124,0,0,0,0,0" in data
+        assert "1,0,0,0,0,0" in data
         assert "unread=0" in data
 
 
 class TestDeleteSms:
-    def test_sends_correct_request(self):
+    def test_sends_correct_request_with_stack(self):
         session = MagicMock()
         session.post.return_value = _mock_response("[error]0\n")
 
         client = TlMr6400Client("http://192.168.1.1", "admin", session=session)
         client._token = "fake_token"
-        client.delete_sms(124)
+        client.delete_sms("1,0,0,0,0,0")
 
         call_args = session.post.call_args
         assert "cgi?4" in call_args[0][0]
         data = call_args[1]["data"]
         assert "LTE_SMS_RECVMSGENTRY" in data
-        assert "124,0,0,0,0,0" in data
+        assert "1,0,0,0,0,0" in data

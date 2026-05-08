@@ -4,13 +4,13 @@ from tl_mr6400.sms_controller import SmsController
 
 
 SMS_DATA = [
-    {"index": "124", "from": "935188", "content": "Hello", "receivedTime": "2026-05-08 12:06:08", "unread": "1"},
-    {"index": "123", "from": "091234", "content": "World", "receivedTime": "2026-05-07 10:09:22", "unread": "0"},
-    {"index": "122", "from": "555555", "content": "Test", "receivedTime": "2026-05-06 09:00:00", "unread": "1"},
+    {"index": "124", "__stack": "1,0,0,0,0,0", "from": "935188", "content": "Hello", "receivedTime": "2026-05-08 12:06:08", "unread": "1"},
+    {"index": "123", "__stack": "2,0,0,0,0,0", "from": "091234", "content": "World", "receivedTime": "2026-05-07 10:09:22", "unread": "0"},
+    {"index": "122", "__stack": "3,0,0,0,0,0", "from": "555555", "content": "Test", "receivedTime": "2026-05-06 09:00:00", "unread": "1"},
 ]
 
 MANY_SMS = [
-    {"index": str(i), "from": f"0900{i:04d}", "content": f"Msg {i}", "receivedTime": f"2026-05-{i:02d} 10:00", "unread": str(i % 2)}
+    {"index": str(i), "__stack": f"{i},0,0,0,0,0", "from": f"0900{i:04d}", "content": f"Msg {i}", "receivedTime": f"2026-05-{i:02d} 10:00", "unread": str(i % 2)}
     for i in range(1, 11)
 ]
 
@@ -68,7 +68,7 @@ class TestMarkRead:
         ctrl = SmsController(client)
         ctrl.set_messages(SMS_DATA)
         ctrl.mark_read()
-        client.set_sms_read.assert_called_once_with(124)
+        client.set_sms_read.assert_called_once_with("1,0,0,0,0,0")
 
     def test_updates_local_state(self):
         client = MagicMock()
@@ -99,7 +99,7 @@ class TestDeleteSms:
         ctrl = SmsController(client)
         ctrl.set_messages(SMS_DATA)
         ctrl.delete()
-        client.delete_sms.assert_called_once_with(124)
+        client.delete_sms.assert_called_once_with("1,0,0,0,0,0")
 
     def test_removes_from_local_list(self):
         client = MagicMock()

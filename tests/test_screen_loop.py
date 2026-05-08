@@ -6,8 +6,8 @@ def _make_client():
     client = MagicMock()
     client.get_status.return_value = {"sigLevel": "3", "netType": "3"}
     client.get_sms.return_value = [
-        {"index": "1", "from": "A", "content": "hi", "receivedTime": "2026-01-01", "unread": "1"},
-        {"index": "2", "from": "B", "content": "yo", "receivedTime": "2026-01-02", "unread": "0"},
+        {"index": "1", "__stack": "1,0,0,0,0,0", "from": "A", "content": "hi", "receivedTime": "2026-01-01", "unread": "1"},
+        {"index": "2", "__stack": "2,0,0,0,0,0", "from": "B", "content": "yo", "receivedTime": "2026-01-02", "unread": "0"},
     ]
     client.get_wlan.return_value = {}
     client.get_lan.return_value = {}
@@ -52,7 +52,7 @@ class TestFetchOnlyOnRefresh:
         loop.tick(timeout=True)
         loop.handle_key("delete")
         assert len(loop.sms_ctrl.messages) == 1
-        client.delete_sms.assert_called_once_with(1)
+        client.delete_sms.assert_called_once_with("1,0,0,0,0,0")
 
     def test_mark_read_updates_local_state(self):
         client = _make_client()
@@ -60,7 +60,7 @@ class TestFetchOnlyOnRefresh:
         loop.tick(timeout=True)
         loop.handle_key("mark_read")
         assert loop.sms_ctrl.messages[0]["unread"] == "0"
-        client.set_sms_read.assert_called_once_with(1)
+        client.set_sms_read.assert_called_once_with("1,0,0,0,0,0")
 
     def test_mark_read_persists_after_refresh(self):
         client = _make_client()
@@ -70,8 +70,8 @@ class TestFetchOnlyOnRefresh:
         assert loop.sms_ctrl.messages[0]["unread"] == "0"
         # Simulate router still returning unread=1 (stale response)
         client.get_sms.return_value = [
-            {"index": "1", "from": "A", "content": "hi", "receivedTime": "2026-01-01", "unread": "1"},
-            {"index": "2", "from": "B", "content": "yo", "receivedTime": "2026-01-02", "unread": "0"},
+            {"index": "1", "__stack": "1,0,0,0,0,0", "from": "A", "content": "hi", "receivedTime": "2026-01-01", "unread": "1"},
+            {"index": "2", "__stack": "2,0,0,0,0,0", "from": "B", "content": "yo", "receivedTime": "2026-01-02", "unread": "0"},
         ]
         loop.tick(timeout=True)
         assert loop.sms_ctrl.messages[0]["unread"] == "0"

@@ -99,6 +99,20 @@ class TestParseEntries:
         assert entries[0]["externalIPAddress"] == "10.2.153.186"
         assert entries[0]["DNSServers"] == "61.31.1.1,61.31.233.1"
 
+    def test_preserves_stack(self):
+        response = (
+            "[1,0,0,0,0,0]1\n"
+            "index=124\n"
+            "from=935188\n"
+            "[2,0,0,0,0,0]1\n"
+            "index=123\n"
+            "from=091234\n"
+            "[error]0\n"
+        )
+        entries = parse_entries(response)
+        assert entries[0]["__stack"] == "1,0,0,0,0,0"
+        assert entries[1]["__stack"] == "2,0,0,0,0,0"
+
     def test_parses_mixed_entries(self):
         response = (
             "[2,1,0,0,0,0]0\n"

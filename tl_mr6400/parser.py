@@ -27,6 +27,9 @@ def parse_entries(text: str) -> list[dict]:
             if current:
                 messages.append(current)
             current = {}
+            stack_match = re.match(r"\[([0-9,]+)\]", line)
+            if stack_match:
+                current["__stack"] = stack_match.group(1)
             continue
         if "=" in line:
             key, _, val = line.partition("=")

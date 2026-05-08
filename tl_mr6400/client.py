@@ -80,12 +80,12 @@ class TlMr6400Client:
         data = "[LAN_WLAN#0,0,0,0,0,0#0,0,0,0,0,0]0,0\r\n"
         return self._query_merged("5", data)
 
-    def set_sms_read(self, sms_id: int) -> None:
-        data = f"[LTE_SMS_RECVMSGENTRY#{sms_id},0,0,0,0,0#0,0,0,0,0,0]0,1\r\nunread=0\r\n"
+    def set_sms_read(self, stack: str) -> None:
+        data = f"[LTE_SMS_RECVMSGENTRY#{stack}#0,0,0,0,0,0]0,1\r\nunread=0\r\n"
         self._query("2", data)
 
-    def delete_sms(self, sms_id: int) -> None:
-        data = f"[LTE_SMS_RECVMSGENTRY#{sms_id},0,0,0,0,0#0,0,0,0,0,0]0,0\r\n"
+    def delete_sms(self, stack: str) -> None:
+        data = f"[LTE_SMS_RECVMSGENTRY#{stack}#0,0,0,0,0,0]0,0\r\n"
         self._query("4", data)
 
     def get_lan(self) -> dict:
