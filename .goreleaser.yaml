@@ -31,11 +31,11 @@ changelog:
       - '^docs:'
       - '^test:'
 
-brews:
-  - repository:
-      owner: recca0120
-      name: homebrew-tap
-    homepage: https://github.com/recca0120/tl-mr6400
-    description: TL-MR6400 router CLI and dashboard
-    install: |
-      bin.install "tl-mr6400"
+# brews:
+#   - repository:
+#       owner: recca0120
+#       name: homebrew-tap
+#     homepage: https://github.com/recca0120/tl-mr6400
+#     description: TL-MR6400 router CLI and dashboard
+#     install: |
+#       bin.install "tl-mr6400"
