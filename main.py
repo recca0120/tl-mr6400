@@ -127,6 +127,12 @@ def cmd_lan(args):
     print(t.render(), end="")
 
 
+def cmd_dashboard(args):
+    from tl_mr6400.screen import run_dashboard
+    client = create_client()
+    run_dashboard(client, interval=args.interval)
+
+
 def main():
     parser = argparse.ArgumentParser(description="TL-MR6400 CLI")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
@@ -139,8 +145,11 @@ def main():
     subparsers.add_parser("wlan", help="Show wireless info")
     subparsers.add_parser("lan", help="Show LAN info")
 
+    dash_parser = subparsers.add_parser("dashboard", help="Live dashboard (htop-style)")
+    dash_parser.add_argument("--interval", type=int, default=5, help="Refresh interval in seconds")
+
     args = parser.parse_args()
-    commands = {"sms": cmd_sms, "status": cmd_status, "wlan": cmd_wlan, "lan": cmd_lan}
+    commands = {"sms": cmd_sms, "status": cmd_status, "wlan": cmd_wlan, "lan": cmd_lan, "dashboard": cmd_dashboard}
     commands[args.command](args)
 
 
